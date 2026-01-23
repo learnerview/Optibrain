@@ -1,0 +1,14 @@
+package com.optibrain.decision.model;
+
+public enum DecisionType {
+    COST_OPTIMIZATION,
+    ANOMALY_DETECTION,
+    FORECASTING,
+    SCALING,
+    RIGHTSIZING,
+    SCHEDULING,
+    BUDGET_ALERT,
+    SECURITY_ALERT,
+    PERFORMANCE_OPTIMIZATION,
+    RESOURCE_CLEANUP
+}

@@ -1,0 +1,65 @@
+﻿[INFO] Scanning for projects...
+[INFO] 
+[INFO] -----------------------< com.optibrain:backend >------------------------
+[INFO] Building OptiBrain Backend 0.0.1-SNAPSHOT
+[INFO]   from pom.xml
+[INFO] --------------------------------[ jar ]---------------------------------
+[INFO] 
+[INFO] --- clean:3.3.2:clean (default-clean) @ backend ---
+[INFO] Deleting D:\Hackathon\Optibrain\backend\target
+[INFO] 
+[INFO] --- processor:5.1-jdk8:process (process) @ backend ---
+[INFO] 
+[INFO] --- resources:3.3.1:resources (default-resources) @ backend ---
+[INFO] Copying 1 resource from src\main\resources to target\classes
+[INFO] Copying 0 resource from src\main\resources to target\classes
+[INFO] 
+[INFO] --- compiler:3.11.0:compile (default-compile) @ backend ---
+[INFO] Changes detected - recompiling the module! :source
+[INFO] Compiling 137 source files with javac [debug release 21] to target\classes
+[INFO] /D:/Hackathon/Optibrain/backend/src/main/java/com/optibrain/config/SecurityConfig.java: D:\Hackathon\Optibrain\backend\src\main\java\com\optibrain\config\SecurityConfig.java uses or overrides a deprecated API.
+[INFO] /D:/Hackathon/Optibrain/backend/src/main/java/com/optibrain/config/SecurityConfig.java: Recompile with -Xlint:deprecation for details.
+[INFO] /D:/Hackathon/Optibrain/backend/src/main/java/com/optibrain/policy/service/PolicyService.java: Some input files use unchecked or unsafe operations.
+[INFO] /D:/Hackathon/Optibrain/backend/src/main/java/com/optibrain/policy/service/PolicyService.java: Recompile with -Xlint:unchecked for details.
+[INFO] Some messages have been simplified; recompile with -Xdiags:verbose to get full output
+[INFO] -------------------------------------------------------------
+[ERROR] COMPILATION ERROR : 
+[INFO] -------------------------------------------------------------
+[ERROR] /D:/Hackathon/Optibrain/backend/src/main/java/com/optibrain/config/DataSeeder.java:[90,33] incompatible types: com.optibrain.autoscaling.model.ActionType cannot be converted to com.optibrain.autoscaling.model.SpotAction.ActionType
+[ERROR] /D:/Hackathon/Optibrain/backend/src/main/java/com/optibrain/config/DataSeeder.java:[98,33] incompatible types: com.optibrain.autoscaling.model.ActionType cannot be converted to com.optibrain.autoscaling.model.SpotAction.ActionType
+[ERROR] /D:/Hackathon/Optibrain/backend/src/main/java/com/optibrain/recommendation/service/RecommendationService.java:[372,9] cannot find symbol
+  symbol:   class Instant
+  location: class com.optibrain.recommendation.service.RecommendationService
+[ERROR] /D:/Hackathon/Optibrain/backend/src/main/java/com/optibrain/recommendation/service/RecommendationService.java:[372,33] cannot find symbol
+  symbol:   variable Instant
+  location: class com.optibrain.recommendation.service.RecommendationService
+[ERROR] /D:/Hackathon/Optibrain/backend/src/main/java/com/optibrain/autoscaling/service/AutoscalingService.java:[92,23] incompatible types: com.optibrain.autoscaling.model.ActionType cannot be converted to com.optibrain.autoscaling.model.SpotAction.ActionType
+[ERROR] /D:/Hackathon/Optibrain/backend/src/main/java/com/optibrain/autoscaling/service/SpotInstanceService.java:[43,35] incompatible types: com.optibrain.autoscaling.model.ActionType cannot be converted to com.optibrain.autoscaling.model.SpotAction.ActionType
+[ERROR] /D:/Hackathon/Optibrain/backend/src/main/java/com/optibrain/autoscaling/service/SpotInstanceService.java:[62,27] incompatible types: com.optibrain.autoscaling.model.SpotAction.ActionType cannot be converted to com.optibrain.autoscaling.model.ActionType
+[INFO] 7 errors 
+[INFO] -------------------------------------------------------------
+[INFO] ------------------------------------------------------------------------
+[INFO] BUILD FAILURE
+[INFO] ------------------------------------------------------------------------
+[INFO] Total time:  9.047 s
+[INFO] Finished at: 2026-01-24T03:04:01+05:30
+[INFO] ------------------------------------------------------------------------
+[ERROR] Failed to execute goal org.apache.maven.plugins:maven-compiler-plugin:3.11.0:compile (default-compile) on project backend: Compilation failure: Compilation failure: 
+[ERROR] /D:/Hackathon/Optibrain/backend/src/main/java/com/optibrain/config/DataSeeder.java:[90,33] incompatible types: com.optibrain.autoscaling.model.ActionType cannot be converted to com.optibrain.autoscaling.model.SpotAction.ActionType
+[ERROR] /D:/Hackathon/Optibrain/backend/src/main/java/com/optibrain/config/DataSeeder.java:[98,33] incompatible types: com.optibrain.autoscaling.model.ActionType cannot be converted to com.optibrain.autoscaling.model.SpotAction.ActionType
+[ERROR] /D:/Hackathon/Optibrain/backend/src/main/java/com/optibrain/recommendation/service/RecommendationService.java:[372,9] cannot find symbol
+[ERROR]   symbol:   class Instant
+[ERROR]   location: class com.optibrain.recommendation.service.RecommendationService
+[ERROR] /D:/Hackathon/Optibrain/backend/src/main/java/com/optibrain/recommendation/service/RecommendationService.java:[372,33] cannot find symbol
+[ERROR]   symbol:   variable Instant
+[ERROR]   location: class com.optibrain.recommendation.service.RecommendationService
+[ERROR] /D:/Hackathon/Optibrain/backend/src/main/java/com/optibrain/autoscaling/service/AutoscalingService.java:[92,23] incompatible types: com.optibrain.autoscaling.model.ActionType cannot be converted to com.optibrain.autoscaling.model.SpotAction.ActionType
+[ERROR] /D:/Hackathon/Optibrain/backend/src/main/java/com/optibrain/autoscaling/service/SpotInstanceService.java:[43,35] incompatible types: com.optibrain.autoscaling.model.ActionType cannot be converted to com.optibrain.autoscaling.model.SpotAction.ActionType
+[ERROR] /D:/Hackathon/Optibrain/backend/src/main/java/com/optibrain/autoscaling/service/SpotInstanceService.java:[62,27] incompatible types: com.optibrain.autoscaling.model.SpotAction.ActionType cannot be converted to com.optibrain.autoscaling.model.ActionType
+[ERROR] -> [Help 1]
+[ERROR] 
+[ERROR] To see the full stack trace of the errors, re-run Maven with the -e switch.
+[ERROR] Re-run Maven using the -X switch to enable full debug logging.
+[ERROR] 
+[ERROR] For more information about the errors and possible solutions, please read the following articles:
+[ERROR] [Help 1] http://cwiki.apache.org/confluence/display/MAVEN/MojoFailureException

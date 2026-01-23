@@ -1,0 +1,366 @@
+﻿[INFO] Scanning for projects...
+[INFO] 
+[INFO] -----------------------< com.optibrain:backend >------------------------
+[INFO] Building OptiBrain Backend 0.0.1-SNAPSHOT
+[INFO]   from pom.xml
+[INFO] --------------------------------[ jar ]---------------------------------
+[INFO] 
+[INFO] >>> spring-boot:3.2.0:run (default-cli) > test-compile @ backend >>>
+[INFO] 
+[INFO] --- processor:5.1-jdk8:process (process) @ backend ---
+[INFO] 
+[INFO] --- resources:3.3.1:resources (default-resources) @ backend ---
+[INFO] Copying 1 resource from src\main\resources to target\classes
+[INFO] Copying 0 resource from src\main\resources to target\classes
+[INFO] 
+[INFO] --- compiler:3.11.0:compile (default-compile) @ backend ---
+[INFO] Nothing to compile - all classes are up to date
+[INFO] 
+[INFO] --- resources:3.3.1:testResources (default-testResources) @ backend ---
+[INFO] skip non existing resourceDirectory D:\Hackathon\Optibrain\backend\src\test\resources
+[INFO] 
+[INFO] --- compiler:3.11.0:testCompile (default-testCompile) @ backend ---
+[INFO] Nothing to compile - all classes are up to date
+[INFO] 
+[INFO] <<< spring-boot:3.2.0:run (default-cli) < test-compile @ backend <<<
+[INFO] 
+[INFO] 
+[INFO] --- spring-boot:3.2.0:run (default-cli) @ backend ---
+[INFO] Attaching agents: []
+Standard Commons Logging discovery in action with spring-jcl: please remove commons-logging.jar from classpath in order to avoid potential conflicts
+
+  .   ____          _            __ _ _
+ /\\ / ___'_ __ _ _(_)_ __  __ _ \ \ \ \
+( ( )\___ | '_ | '_| | '_ \/ _` | \ \ \ \
+ \\/  ___)| |_)| | | | | || (_| |  ) ) ) )
+  '  |____| .__|_| |_|_| |_\__, | / / / /
+ =========|_|==============|___/=/_/_/_/
+ :: Spring Boot ::                (v3.2.0)
+
+2026-01-24 03:15:25 - Starting OptibrainApplication using Java 21.0.7 with PID 9752 (D:\Hackathon\Optibrain\backend\target\classes started by SUMIT in D:\Hackathon\Optibrain\backend)
+2026-01-24 03:15:25 - Running with Spring Boot v3.2.0, Spring v6.1.1
+2026-01-24 03:15:25 - No active profile set, falling back to 1 default profile: "default"
+2026-01-24 03:15:25 - Bootstrapping Spring Data JPA repositories in DEFAULT mode.
+2026-01-24 03:15:25 - Finished Spring Data repository scanning in 58 ms. Found 5 JPA repository interfaces.
+2026-01-24 03:15:26 - Tomcat initialized with port 8080 (http)
+2026-01-24 03:15:26 - Starting service [Tomcat]
+2026-01-24 03:15:26 - Starting Servlet engine: [Apache Tomcat/10.1.16]
+2026-01-24 03:15:26 - Initializing Spring embedded WebApplicationContext
+2026-01-24 03:15:26 - Root WebApplicationContext: initialization completed in 1634 ms
+Standard Commons Logging discovery in action with spring-jcl: please remove commons-logging.jar from classpath in order to avoid potential conflicts
+2026-01-24 03:15:26 - HikariPool-1 - Starting...
+2026-01-24 03:15:26 - HikariPool-1 - Added connection conn0: url=jdbc:h2:mem:testdb user=SA
+2026-01-24 03:15:26 - HikariPool-1 - Start completed.
+2026-01-24 03:15:26 - H2 console available at '/h2-console'. Database available at 'jdbc:h2:mem:testdb'
+2026-01-24 03:15:27 - Filter 'webMvcObservationFilter' configured for use
+2026-01-24 03:15:27 - HHH000204: Processing PersistenceUnitInfo [name: default]
+2026-01-24 03:15:27 - HHH000412: Hibernate ORM core version 6.3.1.Final
+2026-01-24 03:15:27 - HHH000026: Second-level cache disabled
+2026-01-24 03:15:27 - No LoadTimeWeaver setup: ignoring JPA class transformer
+2026-01-24 03:15:27 - HHH90000025: H2Dialect does not need to be specified explicitly using 'hibernate.dialect' (remove the property setting and it will be selected by default)
+2026-01-24 03:15:28 - HHH000489: No JTA platform available (set 'hibernate.transaction.jta.platform' to enable JTA platform integration)
+Hibernate: 
+    drop table if exists audit_logs cascade 
+Hibernate: 
+    drop table if exists financial_reports cascade 
+Hibernate: 
+    drop table if exists optimization_results cascade 
+Hibernate: 
+    drop table if exists orphaned_resources cascade 
+Hibernate: 
+    drop table if exists spot_actions cascade 
+Hibernate: 
+    drop table if exists users cascade 
+Hibernate: 
+    create table audit_logs (
+        savings float(53) not null,
+        score float(53) not null,
+        created_at timestamp(6) with time zone not null,
+        updated_at timestamp(6) with time zone,
+        id uuid not null,
+        explanation varchar(1000),
+        action varchar(255) not null,
+        decision_id varchar(255),
+        mode varchar(255),
+        provider_source varchar(255),
+        reason varchar(255),
+        region varchar(255),
+        resource_id varchar(255) not null,
+        status varchar(255) not null check (status in ('PENDING','SUCCESS','FAILED')),
+        tenant_id varchar(255) not null,
+        primary key (id)
+    )
+Hibernate: 
+    create table financial_reports (
+        current_cost float(53) not null,
+        forecasted_cost float(53) not null,
+        potential_savings float(53) not null,
+        previous_cost float(53) not null,
+        created_at timestamp(6) with time zone not null,
+        updated_at timestamp(6) with time zone,
+        id uuid not null,
+        period varchar(255) not null,
+        source varchar(255) not null,
+        tenant_id varchar(255) not null,
+        top_spenders TEXT not null,
+        primary key (id)
+    )
+Hibernate: 
+    create table optimization_results (
+        estimated_monthly_savings float(53) not null,
+        recommendations_executed integer not null,
+        recommendations_generated integer not null,
+        success boolean not null,
+        created_at timestamp(6) with time zone not null,
+        updated_at timestamp(6) with time zone,
+        id uuid not null,
+        error_message varchar(255),
+        tenant_id varchar(255) not null,
+        primary key (id)
+    )
+Hibernate: 
+    create table orphaned_resources (
+        estimated_monthly_cost float(53) not null,
+        resolved boolean not null,
+        created_at timestamp(6) with time zone not null,
+        updated_at timestamp(6) with time zone,
+        id uuid not null,
+        region varchar(255),
+        resource_id varchar(255) not null unique,
+        resource_type varchar(255) not null,
+        tenant_id varchar(255) not null,
+        primary key (id)
+    )
+Hibernate: 
+    create table spot_actions (
+        predicted_savings float(53) not null,
+        created_at timestamp(6) with time zone not null,
+        scheduled_time timestamp(6) with time zone,
+        updated_at timestamp(6) with time zone,
+        id uuid not null,
+        resource_id varchar(255) not null,
+        status varchar(255) not null check (status in ('PENDING','EXECUTING','COMPLETED','FAILED')),
+        target_instance_type varchar(255),
+        tenant_id varchar(255) not null,
+        type varchar(255) not null check (type in ('MIGRATE_TO_SPOT','FALLBACK_TO_ON_DEMAND','DIVERSITY_BALANCE')),
+        primary key (id)
+    )
+Hibernate: 
+    create table users (
+        active boolean not null,
+        created_at timestamp(6) with time zone not null,
+        updated_at timestamp(6) with time zone,
+        id uuid not null,
+        password varchar(255) not null,
+        tenant_id varchar(255) not null,
+        username varchar(255) not null unique,
+        primary key (id)
+    )
+2026-01-24 03:15:28 - Initialized JPA EntityManagerFactory for persistence unit 'default'
+2026-01-24 03:15:28 - Initialized pricing data for 13 instance types
+2026-01-24 03:15:28 - Initialized 3 default policies
+2026-01-24 03:15:29 - spring.jpa.open-in-view is enabled by default. Therefore, database queries may be performed during view rendering. Explicitly configure spring.jpa.open-in-view to disable this warning
+2026-01-24 03:15:29 - User.withDefaultPasswordEncoder() is considered unsafe for production and is only intended for sample applications.
+2026-01-24 03:15:29 - User.withDefaultPasswordEncoder() is considered unsafe for production and is only intended for sample applications.
+2026-01-24 03:15:29 - 75 mappings in 'requestMappingHandlerMapping'
+2026-01-24 03:15:30 - Patterns [/webjars/**, /**, /swagger-ui*/*swagger-initializer.js, /swagger-ui*/**] in 'resourceHandlerMapping'
+2026-01-24 03:15:30 - Exposing 3 endpoint(s) beneath base path '/actuator'
+2026-01-24 03:15:30 - Will secure any request with [org.springframework.security.web.session.DisableEncodeUrlFilter@3acae925, org.springframework.security.web.context.request.async.WebAsyncManagerIntegrationFilter@67a6f2c4, org.springframework.security.web.context.SecurityContextHolderFilter@4ba056ab, org.springframework.security.web.header.HeaderWriterFilter@52a1d6f, org.springframework.web.filter.CorsFilter@6bac199f, org.springframework.security.web.authentication.logout.LogoutFilter@3c964873, org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter@48c42253, org.springframework.security.web.authentication.ui.DefaultLoginPageGeneratingFilter@730c4dfd, org.springframework.security.web.authentication.ui.DefaultLogoutPageGeneratingFilter@2a47fb5d, org.springframework.security.web.authentication.www.BasicAuthenticationFilter@379ddab2, org.springframework.security.web.savedrequest.RequestCacheAwareFilter@43347199, org.springframework.security.web.servletapi.SecurityContextHolderAwareRequestFilter@20ac726c, org.springframework.security.web.authentication.AnonymousAuthenticationFilter@47a9bcf1, org.springframework.security.web.access.ExceptionTranslationFilter@7625bfbd, org.springframework.security.web.access.intercept.AuthorizationFilter@7aead7d9]
+2026-01-24 03:15:30 - ControllerAdvice beans: 0 @ModelAttribute, 0 @InitBinder, 1 RequestBodyAdvice, 1 ResponseBodyAdvice
+2026-01-24 03:15:30 - ControllerAdvice beans: 2 @ExceptionHandler, 1 ResponseBodyAdvice
+2026-01-24 03:15:30 - Tomcat started on port 8080 (http) with context path '/api'
+2026-01-24 03:15:30 - Started OptibrainApplication in 6.031 seconds (process running for 6.393)
+2026-01-24 03:15:30 - Starting orphaned resource cleanup at 2026-01-24T03:15:30.765691300
+2026-01-24 03:15:30 - Performing orphaned resource cleanup for tenant: tenant-1
+2026-01-24 03:15:30 - [SEEDER] Checking if demo data exists...
+Hibernate: 
+    select
+        count(*) 
+    from
+        financial_reports fr1_0
+2026-01-24 03:15:31 - [SEEDER] Seeding comprehensive demo data for 'demo-tenant'...
+Hibernate: 
+    insert 
+    into
+        financial_reports
+        (created_at, current_cost, forecasted_cost, period, potential_savings, previous_cost, source, tenant_id, top_spenders, updated_at, id) 
+    values
+        (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+Hibernate: 
+    update
+        financial_reports 
+    set
+        current_cost=?,
+        forecasted_cost=?,
+        period=?,
+        potential_savings=?,
+        previous_cost=?,
+        source=?,
+        tenant_id=?,
+        top_spenders=?,
+        updated_at=? 
+    where
+        id=?
+Hibernate: 
+    insert 
+    into
+        audit_logs
+        (action, created_at, decision_id, explanation, mode, provider_source, reason, region, resource_id, savings, score, status, tenant_id, updated_at, id) 
+    values
+        (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+Hibernate: 
+    insert 
+    into
+        audit_logs
+        (action, created_at, decision_id, explanation, mode, provider_source, reason, region, resource_id, savings, score, status, tenant_id, updated_at, id) 
+    values
+        (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+Hibernate: 
+    insert 
+    into
+        spot_actions
+        (created_at, predicted_savings, resource_id, scheduled_time, status, target_instance_type, tenant_id, type, updated_at, id) 
+    values
+        (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+Hibernate: 
+    insert 
+    into
+        spot_actions
+        (created_at, predicted_savings, resource_id, scheduled_time, status, target_instance_type, tenant_id, type, updated_at, id) 
+    values
+        (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+Hibernate: 
+    insert 
+    into
+        orphaned_resources
+        (created_at, estimated_monthly_cost, region, resolved, resource_id, resource_type, tenant_id, updated_at, id) 
+    values
+        (?, ?, ?, ?, ?, ?, ?, ?, ?)
+Hibernate: 
+    insert 
+    into
+        orphaned_resources
+        (created_at, estimated_monthly_cost, region, resolved, resource_id, resource_type, tenant_id, updated_at, id) 
+    values
+        (?, ?, ?, ?, ?, ?, ?, ?, ?)
+2026-01-24 03:15:31 - [SEEDER] Successfully seeded 7 demo records.
+2026-01-24 03:15:32 - Failed to fetch real CPU metrics for tenant tenant-1: The security token included in the request is invalid. (Service: CloudWatch, Status Code: 403, Request ID: d60cb609-d1da-4775-805a-c4368e680715)
+2026-01-24 03:15:32 - Retrieved 5 metrics for tenant: tenant-1
+2026-01-24 03:15:32 - [MOCK] Getting cost estimate for resource: eip-orphan-01
+2026-01-24 03:15:32 - [MOCK] Getting resource type for: eip-orphan-01
+2026-01-24 03:15:32 - [MOCK] Getting resource type for: eip-orphan-01
+2026-01-24 03:15:32 - [MOCK] Getting cost estimate for resource: vol-orphan-01
+2026-01-24 03:15:32 - [MOCK] Getting resource type for: vol-orphan-01
+2026-01-24 03:15:32 - [MOCK] Getting resource type for: vol-orphan-01
+2026-01-24 03:15:32 - [MOCK] Discovering instances
+2026-01-24 03:15:32 - [MOCK] Getting cost estimate for resource: i-mock-001
+2026-01-24 03:15:32 - [MOCK] Getting resource type for: i-mock-001
+2026-01-24 03:15:32 - [MOCK] Getting cost estimate for resource: i-mock-002
+2026-01-24 03:15:32 - [MOCK] Getting resource type for: i-mock-002
+2026-01-24 03:15:32 - [MOCK] Getting cost estimate for resource: i-mock-003
+2026-01-24 03:15:32 - [MOCK] Getting resource type for: i-mock-003
+2026-01-24 03:15:32 - Orphan cleanup completed for tenant tenant-1: 0 resources cleaned up
+2026-01-24 03:15:32 - Starting comprehensive analysis at 2026-01-24T03:15:32.496199
+2026-01-24 03:15:32 - Performing comprehensive analysis for tenant: tenant-1
+2026-01-24 03:15:33 - Failed to calculate RI coverage for tenant default: The security token included in the request is invalid. (Service: CostExplorer, Status Code: 400, Request ID: ac63d0d4-5520-411b-9664-9560fbfac5cd)
+2026-01-24 03:15:35 - Failed to fetch RI recommendations for tenant default: The security token included in the request is invalid. (Service: CostExplorer, Status Code: 400, Request ID: 6da9b50b-e37d-4fb4-a23d-ca2e88aa425e)
+2026-01-24 03:15:36 - Failed to fetch SP recommendations for tenant default: The security token included in the request is invalid. (Service: CostExplorer, Status Code: 400, Request ID: 09870981-9f46-4e66-a315-906a98d0848c)
+2026-01-24 03:15:36 - BUDGET ALERT for tenant tenant-1: Current spend $90520.71490637047 exceeds budget $1000.0
+Hibernate: 
+    insert 
+    into
+        audit_logs
+        (action, created_at, decision_id, explanation, mode, provider_source, reason, region, resource_id, savings, score, status, tenant_id, updated_at, id) 
+    values
+        (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+2026-01-24 03:15:36 - SQL Error: 23502, SQLState: 23502
+2026-01-24 03:15:36 - NULL not allowed for column "TENANT_ID"; SQL statement:
+insert into audit_logs (action,created_at,decision_id,explanation,mode,provider_source,reason,region,resource_id,savings,score,status,tenant_id,updated_at,id) values (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) [23502-224]
+2026-01-24 03:15:36 - Comprehensive analysis failed for tenant tenant-1: could not execute statement [NULL not allowed for column "TENANT_ID"; SQL statement:
+insert into audit_logs (action,created_at,decision_id,explanation,mode,provider_source,reason,region,resource_id,savings,score,status,tenant_id,updated_at,id) values (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) [23502-224]] [insert into audit_logs (action,created_at,decision_id,explanation,mode,provider_source,reason,region,resource_id,savings,score,status,tenant_id,updated_at,id) values (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)]; SQL [insert into audit_logs (action,created_at,decision_id,explanation,mode,provider_source,reason,region,resource_id,savings,score,status,tenant_id,updated_at,id) values (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)]; constraint [null]
+2026-01-24 03:15:36 - Starting autonomous optimization cycle at 2026-01-24T03:15:36.356877400
+2026-01-24 03:15:36 - Processing optimization for tenant: tenant-1 (Demo Tenant)
+2026-01-24 03:15:36 - [MONITOR] Initiating autonomous cost health check for demo-tenant
+Hibernate: 
+    select
+        fr1_0.id,
+        fr1_0.created_at,
+        fr1_0.current_cost,
+        fr1_0.forecasted_cost,
+        fr1_0.period,
+        fr1_0.potential_savings,
+        fr1_0.previous_cost,
+        fr1_0.source,
+        fr1_0.tenant_id,
+        fr1_0.top_spenders,
+        fr1_0.updated_at 
+    from
+        financial_reports fr1_0 
+    where
+        fr1_0.tenant_id=?
+Hibernate: 
+    select
+        sa1_0.id,
+        sa1_0.created_at,
+        sa1_0.predicted_savings,
+        sa1_0.resource_id,
+        sa1_0.scheduled_time,
+        sa1_0.status,
+        sa1_0.target_instance_type,
+        sa1_0.tenant_id,
+        sa1_0.type,
+        sa1_0.updated_at 
+    from
+        spot_actions sa1_0 
+    where
+        sa1_0.tenant_id=?
+2026-01-24 03:15:36 - [MONITOR] Current Total Saved: $1850.5
+2026-01-24 03:15:36 - HTTP POST http://localhost:8000/detect/anomalies
+2026-01-24 03:15:36 - Accept=[application/json, application/*+json]
+2026-01-24 03:15:36 - Writing [{sensitivity=0.1, tenant_id=default, metrics_data=[{timestamp=2026-01-19T08:00:00Z, hourly_cost=25.5, memory_utilization=67.8, cpu_utilization=45.2}, {timestamp=2026-01-19T09:00:00Z, hourly_cost=28.75, memory_utilization=71.2, cpu_utilization=52.1}, {timestamp=2026-01-19T10:00:00Z, hourly_cost=26.25, memory_utilization=69.5, cpu_utilization=48.9}]}] with org.springframework.http.converter.json.MappingJackson2HttpMessageConverter
+2026-01-24 03:15:36 - Failed to fetch anomalies from ML Service: I/O error on POST request for "http://localhost:8000/detect/anomalies": Connection refused: getsockopt
+2026-01-24 03:15:36 - [MONITOR] Detected 2 potential cost anomalies. Triggering AI analysis...
+2026-01-24 03:15:36 - [ALERT] Critical Anomaly detected on 2026-01-19: $82.0 (Deviation: 4.5)
+2026-01-24 03:15:36 - [PREDICTIVE] Skipping scheduled analysis in dry-run mode
+2026-01-24 03:15:36 - Starting scheduled cleanup task for all tenants...
+2026-01-24 03:15:36 - Analyzing resources for tenant: tenant-1
+2026-01-24 03:15:37 - Failed to fetch real CPU metrics for tenant tenant-1: The security token included in the request is invalid. (Service: CloudWatch, Status Code: 403, Request ID: b9a4f483-aad1-45c9-8e74-24f1f56db34f)
+2026-01-24 03:15:37 - Retrieved 5 metrics for tenant: tenant-1
+2026-01-24 03:15:37 - [MOCK] Getting cost estimate for resource: eip-orphan-01
+2026-01-24 03:15:37 - [MOCK] Getting resource type for: eip-orphan-01
+2026-01-24 03:15:37 - [MOCK] Getting resource type for: eip-orphan-01
+2026-01-24 03:15:37 - [MOCK] Getting cost estimate for resource: vol-orphan-01
+2026-01-24 03:15:37 - [MOCK] Getting resource type for: vol-orphan-01
+2026-01-24 03:15:37 - [MOCK] Getting resource type for: vol-orphan-01
+2026-01-24 03:15:37 - [MOCK] Discovering instances
+2026-01-24 03:15:37 - [MOCK] Getting cost estimate for resource: i-mock-001
+2026-01-24 03:15:37 - [MOCK] Getting resource type for: i-mock-001
+2026-01-24 03:15:37 - [MOCK] Getting cost estimate for resource: i-mock-002
+2026-01-24 03:15:37 - [MOCK] Getting resource type for: i-mock-002
+2026-01-24 03:15:37 - [MOCK] Getting cost estimate for resource: i-mock-003
+2026-01-24 03:15:37 - [MOCK] Getting resource type for: i-mock-003
+2026-01-24 03:15:37 - Optimization failed for tenant tenant-1: Cannot invoke "java.lang.Double.doubleValue()" because the return value of "com.optibrain.recommendation.model.Recommendation.getConfidence()" is null
+Hibernate: 
+    insert 
+    into
+        optimization_results
+        (created_at, error_message, estimated_monthly_savings, recommendations_executed, recommendations_generated, success, tenant_id, updated_at, id) 
+    values
+        (?, ?, ?, ?, ?, ?, ?, ?, ?)
+2026-01-24 03:15:37 - Completed autonomous optimization cycle for 1 tenants
+2026-01-24 03:15:37 - === AUTONOMOUS OPTIMIZATION SUMMARY ===
+2026-01-24 03:15:37 - Tenants processed: 0/1
+2026-01-24 03:15:37 - Recommendations generated: 0
+2026-01-24 03:15:37 - Recommendations executed: 0
+2026-01-24 03:15:37 - Estimated monthly savings: $0.0
+2026-01-24 03:15:37 - ========================================
+2026-01-24 03:15:38 - Error detecting volumes: AWS was not able to validate the provided access credentials (Service: Ec2, Status Code: 401, Request ID: c3515e86-1849-4f68-b8f9-246f0595c177)
+2026-01-24 03:15:38 - Error detecting IPs: AWS was not able to validate the provided access credentials (Service: Ec2, Status Code: 401, Request ID: c25d401d-8eba-4f74-ad38-23fbfe02a786)
+2026-01-24 03:15:38 - Error detecting snapshots: AWS was not able to validate the provided access credentials (Service: Ec2, Status Code: 401, Request ID: fb369640-dbad-4c22-803f-666fd5bbcabf)
+2026-01-24 03:15:40 - Error detecting ELBs: The security token included in the request is invalid. (Service: ElasticLoadBalancingV2, Status Code: 403, Request ID: c2c30fb8-3f6c-4f56-b945-c2f92c3fe551)
+2026-01-24 03:15:41 - Error detecting volumes: AWS was not able to validate the provided access credentials (Service: Ec2, Status Code: 401, Request ID: b67ceaf5-9bd1-4c08-b16d-59cf74dd7dc4)
+2026-01-24 03:15:41 - Error detecting IPs: AWS was not able to validate the provided access credentials (Service: Ec2, Status Code: 401, Request ID: 4002add2-0678-405a-8709-f03932004bd4)
+2026-01-24 03:15:41 - Error detecting snapshots: AWS was not able to validate the provided access credentials (Service: Ec2, Status Code: 401, Request ID: 0e7a2732-2274-48b6-9d4d-fd6e4da3908f)
+2026-01-24 03:15:42 - Error detecting ELBs: The security token included in the request is invalid. (Service: ElasticLoadBalancingV2, Status Code: 403, Request ID: dc53da2c-1bb1-42ea-8d3b-c1d4c635598d)
+2026-01-24 03:15:42 - No orphaned resources found for tenant: tenant-1
+2026-01-24 03:15:42 - Scheduled cleanup task completed.
