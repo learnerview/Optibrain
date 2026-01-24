@@ -1,6 +1,6 @@
 # OptiBrain ML Service
 
-Real Machine Learning service for Autonomous FinOps operations.
+Real Machine Learning service for Autonomous Cloud Cost Intelligence operations.
 
 ## Features
 

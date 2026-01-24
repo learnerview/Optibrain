@@ -1,0 +1,48 @@
+{
+    "totalMonthlyCost": 128450,
+    "currency": "INR",
+    "trend": [
+        {
+            "month": "Aug",
+            "cost": 94500
+        },
+        {
+            "month": "Sep",
+            "cost": 101200
+        },
+        {
+            "month": "Oct",
+            "cost": 110300
+        },
+        {
+            "month": "Nov",
+            "cost": 118900
+        },
+        {
+            "month": "Dec",
+            "cost": 125600
+        },
+        {
+            "month": "Jan",
+            "cost": 128450
+        }
+    ],
+    "topServices": [
+        {
+            "name": "EC2",
+            "cost": 62400
+        },
+        {
+            "name": "RDS",
+            "cost": 31400
+        },
+        {
+            "name": "S3",
+            "cost": 21200
+        },
+        {
+            "name": "CloudWatch",
+            "cost": 13450
+        }
+    ]
+}

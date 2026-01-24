@@ -11,35 +11,36 @@ interface AutonomousMetricsProps {
 export default function AutonomousMetrics({ data }: AutonomousMetricsProps) {
   const metrics = [
     {
-      title: "Total Savings",
-      value: data ? `$${(data.totalSaved / 1000).toFixed(1)}K` : `$${(mockCloudData.totalSavingsYTD / 1000).toFixed(1)}K`,
-      change: data ? `+$${(data.potentialMonthlySavings / 100).toFixed(1)}K` : "+27%",
-      icon: TrendingUp,
-      color: "from-emerald-500 to-green-600",
+      title: "Total Monthly Cost",
+      value: data ? `${data.currency} ${data.totalMonthlyCost.toLocaleString()}` : "INR 128,450",
+      change: data ? "+4.2%" : "+4.2%",
+      icon: Activity,
+      color: "from-blue-500 to-indigo-600",
+      trend: "up",
     },
     {
-      title: "Cost Reduction",
-      value: data ? `${data.savingsPercentage}%` : "46.2%",
-      change: "-7.8%",
-      icon: TrendingDown,
-      color: "from-cyan-500 to-blue-600",
-      trend: "down",
-    },
-    {
-      title: "Engine Health",
-      value: data ? "OPTIMAL" : "OPTIMAL",
-      change: "+12.7%",
+      title: "Active Services",
+      value: data ? data.topServices.length : "4",
+      change: "Monitoring",
       icon: Activity,
       color: "from-emerald-500 to-teal-600",
       status: "optimal",
     },
     {
-      title: "AI Risk Score",
-      value: data ? "0.08" : "0.11",
-      change: "Lower is better",
+      title: "Cost Potential Savings",
+      value: "INR 13,000",
+      change: "AI-Optimized",
+      icon: TrendingDown,
+      color: "from-cyan-500 to-blue-600",
+      trend: "down",
+    },
+    {
+      title: "Intelligence Health",
+      value: "99.9%",
+      change: "Stable",
       icon: AlertTriangle,
       color: "from-purple-500 to-pink-600",
-      trend: "down",
+      trend: "none",
     },
   ]
 
@@ -57,8 +58,8 @@ export default function AutonomousMetrics({ data }: AutonomousMetricsProps) {
               </div>
               <span
                 className={`text-xs font-semibold px-2 py-1 rounded-full ${metric.trend === "down" || metric.status === "optimal"
-                    ? "bg-emerald-500/20 text-emerald-400"
-                    : "bg-amber-500/20 text-amber-400"
+                  ? "bg-emerald-500/20 text-emerald-400"
+                  : "bg-amber-500/20 text-amber-400"
                   }`}
               >
                 {metric.change}

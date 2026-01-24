@@ -1,0 +1,14 @@
+[
+    {
+        "resource": "EC2 Instance i-023ab",
+        "issue": "Idle for 92% of the time",
+        "recommendation": "Downscale or stop instance",
+        "monthlySavings": 8400
+    },
+    {
+        "resource": "RDS MySQL db-prod",
+        "issue": "Over-provisioned storage",
+        "recommendation": "Reduce allocated storage by 30%",
+        "monthlySavings": 4600
+    }
+]

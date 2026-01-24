@@ -6,7 +6,7 @@ import { Card } from "@/components/ui/card"
 const features = [
   {
     icon: Brain,
-    title: "AI FinOps Copilot",
+    title: "AI Cloud Cost Intelligence Copilot",
     description: "Conversational AI that answers complex cost questions and provides intelligent recommendations",
     highlight: "Natural language interface powered by GPT-4",
     items: ["Multi-intent understanding", "Real-time data correlation", "Context-aware insights"],
@@ -41,7 +41,7 @@ export default function FeaturesShowcase() {
         <div className="text-center mb-16">
           <h2 className="text-4xl md:text-5xl font-bold mb-4">Enterprise-Grade Features</h2>
           <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-            Purpose-built for modern DevOps and FinOps teams at scale
+            Purpose-built for modern DevOps and Cloud Cost Intelligence teams at scale
           </p>
         </div>
 

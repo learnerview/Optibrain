@@ -157,24 +157,57 @@ export default function AICopilot() {
     setInput("");
     setLoading(true);
 
-    // TODO: Phase 4 - Replace mock responses with real AI backend:
-    // POST /api/copilot/chat with { message: messageText }
-    // This will call the real AI service for intelligent responses
+    try {
+      // Call backend API
+      const response = await fetch("http://localhost:8080/api/copilot/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message: messageText }),
+      });
 
-    // Simulate AI response delay
-    setTimeout(() => {
-      const response = generateAIResponse(messageText);
+      if (response.ok) {
+        const data = await response.json();
+        const responseData = data.data;
+
+        const assistantMessage: Message = {
+          id: (Date.now() + 1).toString(),
+          role: "assistant",
+          content: responseData.type === "text" ? responseData.text : `[${responseData.type}]`,
+          timestamp: new Date(),
+          response: {
+            type: responseData.type,
+            data: responseData.data || responseData,
+          },
+        };
+
+        setMessages((prev) => [...prev, assistantMessage]);
+      } else {
+        // Fallback to local response if backend fails
+        const fallbackResponse = generateAIResponse(messageText);
+        const assistantMessage: Message = {
+          id: (Date.now() + 1).toString(),
+          role: "assistant",
+          content: fallbackResponse.type === "text" ? fallbackResponse.data.text : `[${fallbackResponse.type}]`,
+          timestamp: new Date(),
+          response: fallbackResponse,
+        };
+        setMessages((prev) => [...prev, assistantMessage]);
+      }
+    } catch (error) {
+      console.error("Copilot API error:", error);
+      // Fallback to local response
+      const fallbackResponse = generateAIResponse(messageText);
       const assistantMessage: Message = {
         id: (Date.now() + 1).toString(),
         role: "assistant",
-        content:
-          response.type === "text" ? response.data.text : `[${response.type}]`,
+        content: fallbackResponse.type === "text" ? fallbackResponse.data.text : `[${fallbackResponse.type}]`,
         timestamp: new Date(),
-        response,
+        response: fallbackResponse,
       };
       setMessages((prev) => [...prev, assistantMessage]);
+    } finally {
       setLoading(false);
-    }, 800);
+    }
   };
 
   return (

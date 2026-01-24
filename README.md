@@ -1,12 +1,12 @@
-# OptiBrain: AI-Powered Cloud FinOps & Autonomous Optimization
+# OptiBrain: AI-Powered Cloud Cost Intelligence Platform
 
-OptiBrain is an advanced cloud cost optimization platform designed to automate FinOps workflows. It combines real-time infrastructure monitoring, machine learning-driven analysis, and automated resource adjustment to minimize cloud spend while maintaining high performance.
+OptiBrain is an AI-powered Cloud Cost Intelligence Platform that analyzes cloud usage patterns, detects anomalies, and provides intelligent cost optimization recommendations.
 
 ## 🏗️ System Architecture
 
 OptiBrain is built as a distributed three-tier system:
 
-*   **⚡ FinOps Backend**: A robust Spring Boot service managing the core business logic, AWS service integrations (via LocalStack), audit logging, and security.
+*   **⚡ Cost Intelligence Backend**: A robust Spring Boot service managing the core business logic, AWS service integrations (via LocalStack), audit logging, and security.
 *   **🎨 Analytics Frontend**: A Next.js-powered dashboard providing executive visibility into cloud spend, recommendation management, and system health.
 *   **🧠 AI Prediction Service**: A FastAPI-based machine learning engine specialized in resource usage forecasting, spot price prediction, and anomaly detection.
 
@@ -14,7 +14,7 @@ OptiBrain is built as a distributed three-tier system:
 
 ## 🚀 Core Features
 
-### 1. FinOps & Cost Analytics
+### 1. Cloud Cost Analytics
 - **Cost Variance Analysis**: Detect and report on budget deviations in real-time.
 - **Unit Economics**: Track cloud costs relative to business KPIs.
 - **ROI Tracking**: Visualize the financial impact of automated optimizations.

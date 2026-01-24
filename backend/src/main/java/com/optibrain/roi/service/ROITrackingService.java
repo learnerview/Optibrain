@@ -1,7 +1,5 @@
 package com.optibrain.roi.service;
 
-import com.optibrain.analytics.model.FinancialReport;
-import com.optibrain.analytics.repository.FinancialReportRepository;
 import com.optibrain.audit.model.AuditLog;
 import com.optibrain.audit.model.AuditStatus;
 import com.optibrain.audit.repository.AuditLogRepository;
@@ -27,22 +25,21 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class ROITrackingService {
 
-    private final FinancialReportRepository financialReportRepository;
     private final AuditLogRepository auditLogRepository;
     private final SpotActionRepository spotActionRepository;
     private final TenantCredentialService tenantCredentialService;
 
     public Map<String, Object> getExecutiveSummary() {
-        log.info("[ROI] Generating global executive ROI summary");
+        log.info("[ROI] Generating global executive ROI summary (Demo Mode)");
         
-        List<FinancialReport> allReports = financialReportRepository.findAll();
-        double totalSavings = allReports.stream().mapToDouble(FinancialReport::getPotentialSavings).sum();
-        double totalForecasted = allReports.stream().mapToDouble(FinancialReport::getForecastedCost).sum();
+        // Demo-safe implementation - returns deterministic values
+        double totalSavings = 156000.0; // Annual savings from demo story
+        double totalForecasted = 128450.0; // Monthly cost from demo story
         
         Map<String, Object> summary = new HashMap<>();
         summary.put("totalFleetSavings", totalSavings);
-        summary.put("averageRoi", totalForecasted > 0 ? (totalSavings / totalForecasted) * 100 : 25.5);
-        summary.put("totalTenantsMonitored", tenantCredentialService.getAllTenants().size());
+        summary.put("averageRoi", (totalSavings / totalForecasted) * 100);
+        summary.put("totalTenantsMonitored", 1);
         summary.put("activeAutomations", spotActionRepository.count());
         summary.put("lastCalculated", LocalDateTime.now());
         
@@ -75,21 +72,21 @@ public class ROITrackingService {
     }
 
     public TenantROIReport generateROIReport(String tenantId) {
-        log.info("[ROI] Generating detailed ROI report for tenant: {}", tenantId);
+        log.info("[ROI] Generating detailed ROI report for tenant: {} (Demo Mode)", tenantId);
         
         Tenant tenant = tenantCredentialService.getTenant(tenantId);
-        List<FinancialReport> reports = financialReportRepository.findByTenantId(tenantId);
         List<SpotAction> actions = spotActionRepository.findByTenantId(tenantId);
         List<AuditLog> logs = auditLogRepository.findByTenantId(tenantId);
         
+        // Demo-safe values from story
         double realizedSavings = actions.stream().mapToDouble(SpotAction::getPredictedSavings).sum();
-        double potentialSavings = reports.stream().mapToDouble(FinancialReport::getPotentialSavings).sum();
+        double potentialSavings = 13000.0; // Monthly savings from demo story
         
         ROIMetrics metrics = ROIMetrics.builder()
                 .totalInvestment(500.0)
                 .totalSavings(realizedSavings)
-                .monthlySavings(realizedSavings / 3.0)
-                .annualSavings(realizedSavings * 4)
+                .monthlySavings(potentialSavings)
+                .annualSavings(potentialSavings * 12)
                 .roiPercentage(realizedSavings > 0 ? (realizedSavings / 500.0) * 100 : 0)
                 .averagePaybackDays(12.0)
                 .trend("EXCELLENT")
@@ -106,7 +103,7 @@ public class ROITrackingService {
 
         return TenantROIReport.builder()
                 .tenantId(tenantId)
-                .tenantName(tenant != null ? tenant.getName() : "Unknown")
+                .tenantName(tenant != null ? tenant.getName() : "Demo Tenant")
                 .reportGeneratedAt(LocalDateTime.now())
                 .tenantSince(LocalDateTime.now().minusMonths(6))
                 .currentPlan("ENTERPRISE")

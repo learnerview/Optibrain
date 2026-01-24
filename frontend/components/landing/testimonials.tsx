@@ -5,7 +5,7 @@ import { Star } from "lucide-react"
 const testimonials = [
   {
     quote:
-      "OptiBrain cut our AWS bill by 47% in the first month. The autonomous decision engine is like having a team of expert FinOps engineers working 24/7.",
+      "OptiBrain cut our AWS bill by 47% in the first month. The autonomous decision engine is like having a team of expert Cloud Cost Intelligence engineers working 24/7.",
     savings: "$2.3M saved annually",
     author: "Sarah Chen",
     title: "VP of Engineering",

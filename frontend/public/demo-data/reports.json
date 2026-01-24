@@ -1,0 +1,13 @@
+{
+    "month": "January 2026",
+    "totalCost": 128450,
+    "previousMonthCost": 125600,
+    "costChange": 2.27,
+    "totalSavings": 13000,
+    "savingsOpportunities": 2,
+    "topService": "EC2",
+    "topServiceCost": 62400,
+    "anomaliesDetected": 1,
+    "optimizationsApplied": 0,
+    "generatedAt": "2026-01-24T07:00:00"
+}

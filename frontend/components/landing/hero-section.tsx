@@ -38,14 +38,14 @@ export default function HeroSection() {
           <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full border border-cyan-500/30 bg-cyan-500/5 mb-8">
             <span className="w-2 h-2 bg-cyan-500 rounded-full animate-pulse"></span>
             <span className="text-xs font-medium bg-gradient-to-r from-cyan-400 to-purple-400 bg-clip-text text-transparent">
-              AI-Powered FinOps Platform
+              AI-Powered Cloud Cost Intelligence Platform
             </span>
           </div>
 
           <h1 className="text-6xl sm:text-7xl lg:text-8xl font-bold mb-8 leading-tight tracking-tight">
             Autonomous AI for{" "}
             <span className="bg-gradient-to-r from-cyan-400 via-blue-400 to-purple-400 bg-clip-text text-transparent block">
-              Multi-Cloud FinOps
+              Multi-Cloud Intelligence
             </span>
           </h1>
 

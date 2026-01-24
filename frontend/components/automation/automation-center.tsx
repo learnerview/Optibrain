@@ -55,19 +55,26 @@ export default function AutomationCenter() {
         </div>
         <div className="glass p-6 rounded-xl border border-border/50">
           <p className="text-sm text-muted-foreground mb-2">Last Run</p>
-          <p className="text-lg font-semibold">2 hours ago</p>
-          <p className="text-xs text-green-500 mt-1">✓ All rules executed</p>
+          <p className="text-lg font-semibold">Demo Mode</p>
+          <p className="text-xs text-amber-400 mt-1">Execution engine in development</p>
         </div>
       </div>
 
       {/* Rules list */}
       <div className="glass rounded-xl border border-border/50 overflow-hidden">
         <div className="p-6 border-b border-border/50 flex items-center justify-between">
-          <h3 className="text-lg font-semibold">Automation Rules</h3>
-          <Button size="sm" className="gap-2">
+          <div className="flex items-center gap-3">
+            <h3 className="text-lg font-semibold">Automation Rules</h3>
+            <span className="px-2 py-1 text-xs bg-amber-500/20 text-amber-400 border border-amber-500/30 rounded">Demo Mode</span>
+          </div>
+          <button
+            className="px-3 py-1.5 text-sm bg-secondary/50 text-muted-foreground rounded-lg cursor-not-allowed opacity-50 flex items-center gap-2"
+            disabled
+            title="Demo Mode - Rule creation coming soon"
+          >
             <Plus className="w-4 h-4" />
             Add Rule
-          </Button>
+          </button>
         </div>
 
         <div className="divide-y divide-border/50">
@@ -95,9 +102,6 @@ export default function AutomationCenter() {
                 </div>
                 <div className="flex items-center gap-3">
                   <Switch checked={rule.enabled} onChange={() => toggleRule(rule.id)} />
-                  <button className="p-2 rounded-lg hover:bg-destructive/20 text-muted-foreground hover:text-destructive transition">
-                    <Trash2 className="w-4 h-4" />
-                  </button>
                 </div>
               </div>
             </div>

@@ -86,7 +86,7 @@ export const useAuthStore = create<AuthStore>()(
           email,
           name: email.split("@")[0],
           company: "Your Company",
-          role: "FinOps Engineer",
+          role: "Cloud Intelligence Engineer",
         }
         set({ user, isAuthenticated: true })
       },

@@ -46,7 +46,7 @@ export default function ArchitectureFlow() {
         <div className="text-center mb-20">
           <h2 className="text-4xl md:text-5xl font-bold mb-4">How OptiBrain Works</h2>
           <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-            Autonomous FinOps engine that continuously learns and optimizes your cloud infrastructure
+            Autonomous Cloud Cost Intelligence engine that continuously learns and optimizes your cloud infrastructure
           </p>
         </div>
 

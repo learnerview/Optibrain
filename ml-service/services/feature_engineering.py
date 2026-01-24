@@ -7,7 +7,7 @@ import logging
 logger = logging.getLogger(__name__)
 
 class FeatureEngineering:
-    """Real feature engineering for FinOps ML models"""
+    """Real feature engineering for Cloud Cost Intelligence ML models"""
     
     def __init__(self):
         self.feature_names = [

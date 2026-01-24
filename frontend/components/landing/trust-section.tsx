@@ -22,7 +22,7 @@ const trustItems = [
   {
     icon: Award,
     title: "Industry Recognition",
-    description: "Trusted by Fortune 500 companies and recognized leader in FinOps",
+    description: "Trusted by Fortune 500 companies and recognized leader in Cloud Cost Intelligence",
   },
 ]
 

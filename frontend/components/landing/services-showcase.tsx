@@ -23,7 +23,7 @@ const services = [
   {
     icon: Brain,
     title: "AI Copilot",
-    description: "Conversational AI that answers your FinOps questions and provides actionable insights.",
+    description: "Conversational AI that answers your Cloud Cost Intelligence questions and provides actionable insights.",
     features: ["Natural language queries", "Cost analysis", "Trend explanation", "Custom investigations"],
   },
   {
@@ -51,7 +51,7 @@ export default function ServicesShowcase() {
     <section id="services" className="py-20 px-4 sm:px-6 lg:px-8">
       <div className="max-w-7xl mx-auto">
         <div className="text-center mb-16">
-          <h2 className="text-4xl font-bold mb-4">Complete FinOps Solution</h2>
+          <h2 className="text-4xl font-bold mb-4">Complete Cloud Cost Intelligence Solution</h2>
           <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
             Six core modules designed to give you complete control over your multi-cloud spending.
           </p>

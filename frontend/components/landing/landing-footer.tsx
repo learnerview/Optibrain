@@ -70,7 +70,7 @@ export default function LandingFooter() {
           <div className="mb-16 p-8 rounded-xl glass border border-cyan-500/30 bg-gradient-to-r from-cyan-500/10 to-purple-500/10">
             <h3 className="text-2xl font-bold mb-2">Stay Updated</h3>
             <p className="text-muted-foreground mb-4">
-              Get the latest FinOps insights and OptiBrain updates delivered to your inbox.
+              Get the latest Cloud Cost Intelligence insights and OptiBrain updates delivered to your inbox.
             </p>
             <div className="flex gap-2 max-w-md">
               <input
@@ -99,7 +99,7 @@ export default function LandingFooter() {
                 </span>
               </div>
               <p className="text-sm text-muted-foreground mb-6">
-                Autonomous FinOps operating system for multi-cloud enterprises. Making cloud economics intelligent and
+                Autonomous Cloud Cost Intelligence operating system for multi-cloud enterprises. Making cloud economics intelligent and
                 autonomous.
               </p>
               {/* Social links */}

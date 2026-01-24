@@ -41,7 +41,7 @@ export default function AboutSection() {
 
               <p className="text-lg text-muted-foreground mb-6 leading-relaxed">
                 OptiBrain is an autonomous AI platform designed to revolutionize how enterprises manage multi-cloud
-                financial operations. We combine cutting-edge machine learning with deep FinOps expertise to deliver
+                financial operations. We combine cutting-edge machine learning with deep Cloud Cost Intelligence expertise to deliver
                 intelligent, real-time cost optimization across AWS, Azure, GCP, and beyond.
               </p>
 

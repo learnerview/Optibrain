@@ -54,7 +54,7 @@ export default function FeaturesGrid() {
           <h2 className="text-4xl sm:text-5xl font-bold mb-4">
             Enterprise-Grade{" "}
             <span className="bg-gradient-to-r from-cyan-400 to-purple-400 bg-clip-text text-transparent">
-              FinOps Platform
+              Cloud Cost Intelligence Platform
             </span>
           </h2>
           <p className="text-lg text-muted-foreground max-w-2xl mx-auto">

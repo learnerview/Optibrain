@@ -43,7 +43,7 @@ public class PyBridgeService implements AIService {
             // Try to use real ML service for intelligent responses
             Map<String, Object> request = Map.of(
                 "message", userMessage,
-                "context", "finops_assistant"
+                "context", "cloud_intelligence_assistant"
             );
             
             Map response = restTemplate.postForObject(mlServiceUrl + "/chat/intelligent", request, Map.class);

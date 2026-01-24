@@ -15,7 +15,7 @@ async def test_generate_dynamic_configuration():
     aws_data = {
         "resources": [{"id": "i-1"}, {"id": "i-2"}],
         "costData": {"monthlyCost": 1500.0},
-        "tags": {"commonTags": ["env:prod", "team:finops"]}
+        "tags": {"commonTags": ["env:prod", "team:cloud_intelligence"]}
     }
     
     tenant_id = "test-tenant-dynamic"

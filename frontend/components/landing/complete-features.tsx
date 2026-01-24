@@ -79,7 +79,7 @@ export default function CompleteFeatures() {
       <div className="max-w-7xl mx-auto relative z-10">
         <div className="text-center mb-16">
           <h2 className="text-4xl sm:text-5xl font-bold mb-4">
-            Complete FinOps{" "}
+            Complete Cloud Cost Intelligence{" "}
             <span className="bg-gradient-to-r from-cyan-400 to-purple-400 bg-clip-text text-transparent">Solution</span>
           </h2>
           <p className="text-lg text-muted-foreground max-w-2xl mx-auto">

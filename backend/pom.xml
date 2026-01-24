@@ -12,7 +12,7 @@
 	<artifactId>backend</artifactId>
 	<version>0.0.1-SNAPSHOT</version>
 	<name>OptiBrain Backend</name>
-	<description>Autonomous FinOps Engine</description>
+	<description>Cloud Cost Intelligence Platform</description>
 	<properties>
 		<java.version>21</java.version>
 		<lombok.version>1.18.34</lombok.version>
@@ -146,6 +146,11 @@
 			<groupId>com.opencsv</groupId>
 			<artifactId>opencsv</artifactId>
 			<version>5.9</version>
+		</dependency>
+		<!-- WebSocket Support -->
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-websocket</artifactId>
 		</dependency>
 		<dependency>
 			<groupId>org.springframework.boot</groupId>

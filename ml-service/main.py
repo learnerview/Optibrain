@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException, BackgroundTasks
+from fastapi import FastAPI, HTTPException, BackgroundTasks, WebSocket
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import List, Dict, Optional, Any
@@ -11,6 +11,7 @@ from services.model_manager import ModelManager
 from services.feature_engineering import FeatureEngineering
 from services.anomaly_detection import AnomalyDetectionService
 from services.forecasting_service import ForecastingService
+from services.chat_service import websocket_endpoint, chat_http_endpoint
 from utils.logger import setup_logger
 from config.settings import Settings
 
@@ -42,7 +43,7 @@ async def lifespan(app: FastAPI):
 # Create FastAPI app
 app = FastAPI(
     title="OptiBrain ML Service",
-    description="Real Machine Learning for Autonomous FinOps",
+    description="Real Machine Learning for Autonomous Cloud Cost Intelligence",
     version="1.0.0",
     lifespan=lifespan
 )
@@ -241,7 +242,7 @@ class ChatRequest(BaseModel):
 @app.post("/chat/intelligent")
 async def intelligent_chat(request: ChatRequest):
     """
-    Process natural language queries about FinOps data using LLM capability
+    Process natural language queries about Cloud Cost Intelligence data using LLM capability
     """
     try:
         # In a real implementation, this would call an LLM service
@@ -259,6 +260,16 @@ async def intelligent_chat(request: ChatRequest):
     except Exception as e:
         logger.error(f"Chat processing failed: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
+
+@app.websocket("/ws/chat/{user_id}")
+async def websocket_chat(websocket: WebSocket, user_id: str):
+    """WebSocket endpoint for real-time chat"""
+    await websocket_endpoint(websocket, user_id)
+
+@app.post("/chat/message")
+async def chat_message(message: str, user_id: str = "default"):
+    """HTTP endpoint for chat (fallback)"""
+    return await chat_http_endpoint(message, user_id)
 
 if __name__ == "__main__":
     settings = Settings()

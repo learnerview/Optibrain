@@ -21,7 +21,7 @@ public class OpenApiConfig {
         return new OpenAPI()
                 .info(new Info()
                         .title("OptiBrain API")
-                        .description("Autonomous FinOps Engine API Documentation")
+                        .description("Cloud Cost Intelligence Platform API Documentation")
                         .version("1.0.0")
                         .contact(new Contact()
                                 .name("OptiBrain Team")

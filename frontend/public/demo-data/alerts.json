@@ -1,0 +1,29 @@
+[
+    {
+        "id": "alert-001",
+        "type": "COST_SPIKE",
+        "severity": "HIGH",
+        "message": "EC2 costs increased by 116% on 2026-01-14",
+        "service": "EC2",
+        "timestamp": "2026-01-14T08:15:00",
+        "acknowledged": false
+    },
+    {
+        "id": "alert-002",
+        "type": "IDLE_RESOURCE",
+        "severity": "MEDIUM",
+        "message": "EC2 Instance i-023ab idle for 92% of the time",
+        "service": "EC2",
+        "timestamp": "2026-01-15T09:00:00",
+        "acknowledged": false
+    },
+    {
+        "id": "alert-003",
+        "type": "OPTIMIZATION_AVAILABLE",
+        "severity": "LOW",
+        "message": "2 new optimization recommendations available",
+        "service": "Multiple",
+        "timestamp": "2026-01-15T10:30:00",
+        "acknowledged": false
+    }
+]

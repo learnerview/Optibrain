@@ -1,0 +1,50 @@
+[
+    {
+        "id": "opt-001",
+        "action": "Terminate Idle EC2 Instance",
+        "resourceId": "i-023ab",
+        "resourceName": "EC2 Instance i-023ab",
+        "status": "Simulated",
+        "monthlySavings": 8400,
+        "confidence": "High",
+        "createdAt": "2026-01-15T10:30:00",
+        "appliedAt": null,
+        "description": "EC2 instance idle for 92% of the time. Terminating will save ₹8,400/month."
+    },
+    {
+        "id": "opt-002",
+        "action": "Reduce RDS Storage by 30%",
+        "resourceId": "db-prod",
+        "resourceName": "RDS MySQL db-prod",
+        "status": "Pending",
+        "monthlySavings": 4600,
+        "confidence": "High",
+        "createdAt": "2026-01-15T10:32:00",
+        "appliedAt": null,
+        "description": "RDS storage over-provisioned. Reducing by 30% will save ₹4,600/month."
+    },
+    {
+        "id": "opt-003",
+        "action": "Migrate to Spot Instances",
+        "resourceId": "i-089gh",
+        "resourceName": "EC2 Instance i-089gh",
+        "status": "Applied",
+        "monthlySavings": 6200,
+        "confidence": "High",
+        "createdAt": "2026-01-10T14:20:00",
+        "appliedAt": "2026-01-12T09:15:00",
+        "description": "Successfully migrated to Spot Instance, saving ₹6,200/month."
+    },
+    {
+        "id": "opt-004",
+        "action": "Downgrade RDS Instance Type",
+        "resourceId": "db-analytics",
+        "resourceName": "RDS PostgreSQL db-analytics",
+        "status": "Rejected",
+        "monthlySavings": 3800,
+        "confidence": "Medium",
+        "createdAt": "2026-01-08T11:45:00",
+        "appliedAt": null,
+        "description": "Rejected due to performance requirements."
+    }
+]

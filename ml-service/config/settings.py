@@ -37,6 +37,10 @@ class Settings(BaseSettings):
     LOG_LEVEL: str = "INFO"
     LOG_FILE: str = "logs/ml_service.log"
     
+    # Gemini API Configuration
+    GEMINI_API_KEY: str = "AIzaSyCESW_0GwkqGk6jLvjeKmlJ5AMYG08MllQ"
+    GEMINI_MODEL: str = "gemini-pro"
+    
     class Config:
         env_file = ".env"
         env_file_encoding = "utf-8"

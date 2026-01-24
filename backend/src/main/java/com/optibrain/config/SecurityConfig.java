@@ -18,17 +18,23 @@ import static org.springframework.security.config.Customizer.withDefaults;
 @EnableWebSecurity
 public class SecurityConfig {
 
+    @org.springframework.beans.factory.annotation.Value("${app.demo-mode:false}")
+    private boolean demoMode;
+
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
-            .csrf(AbstractHttpConfigurer::disable) // Disable CSRF for non-browser clients/H2 console
-            .authorizeHttpRequests(auth -> auth
-                .requestMatchers("/h2-console/**", "/actuator/**", "/error", "/swagger-ui/**", "/v3/api-docs/**").permitAll()
-                .anyRequest().authenticated()
-            )
-            .formLogin(withDefaults()) // Enable Form Login
-            .httpBasic(withDefaults()) // Enable HTTP Basic for API testing
-            .headers(headers -> headers.frameOptions(HeadersConfigurer.FrameOptionsConfig::disable)); // Allow H2 Console frames
+            .csrf(AbstractHttpConfigurer::disable)
+            .authorizeHttpRequests(auth -> {
+                if (demoMode) {
+                    auth.requestMatchers("/api/**").permitAll();
+                }
+                auth.requestMatchers("/h2-console/**", "/actuator/**", "/error", "/swagger-ui/**", "/v3/api-docs/**").permitAll()
+                    .anyRequest().authenticated();
+            })
+            .formLogin(withDefaults())
+            .httpBasic(withDefaults())
+            .headers(headers -> headers.frameOptions(HeadersConfigurer.FrameOptionsConfig::disable));
 
         return http.build();
     }

@@ -1,8 +1,5 @@
 package com.optibrain.config;
 
-import com.optibrain.analytics.dto.TopSpenderDTO;
-import com.optibrain.analytics.model.FinancialReport;
-import com.optibrain.analytics.repository.FinancialReportRepository;
 import com.optibrain.audit.model.AuditLog;
 import com.optibrain.audit.model.AuditStatus;
 import com.optibrain.audit.repository.AuditLogRepository;
@@ -17,114 +14,107 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.stereotype.Component;
 
-import java.time.LocalDateTime;
 import java.util.List;
 
+/**
+ * DataSeeder for OptiBrain Demo Mode.
+ * Seeds the 4 vertical demo pillars with consistent, deterministic data.
+ * Pruned of unstable ML/FinancialReport entities for hackathon stability.
+ */
 @Component
 @Slf4j
 @RequiredArgsConstructor
 public class DataSeeder implements CommandLineRunner {
 
-    private final FinancialReportRepository financialReportRepository;
     private final AuditLogRepository auditLogRepository;
     private final SpotActionRepository spotActionRepository;
     private final OrphanedResourceRepository orphanedResourceRepository;
 
     @Override
     public void run(String... args) {
-        log.info("[SEEDER] Checking if demo data exists...");
+        log.info("🚀 [DEMO-SEEDER] Initializing OptiBrain Story Data...");
         
-        if (financialReportRepository.count() == 0) {
-            seedDemoData();
+        if (auditLogRepository.count() == 0) {
+            seedStoryData();
+            log.info("✅ [DEMO-SEEDER] Story Data Seeded Successfully.");
         } else {
-            log.info("[SEEDER] System already seeded. Skipping...");
+            log.info("ℹ️ [DEMO-SEEDER] Data already exists. Skipping initialization.");
         }
     }
 
-    private void seedDemoData() {
-        log.info("[SEEDER] Seeding comprehensive demo data for 'demo-tenant'...");
+    /**
+     * Seeds the demo story:
+     * 1. A High-Severity Anomaly (AuditLog)
+     * 2. A Corresponding Recommendation (SpotAction)
+     * 3. Cleanup Actions (OrphanedResource)
+     */
+    private void seedStoryData() {
         String tenantId = "demo-tenant";
 
-        // 1. Seed Financial Reports
-        FinancialReport report = FinancialReport.builder()
-                .period("MONTHLY")
-                .currentCost(12500.00)
-                .previousCost(10800.00)
-                .forecastedCost(11500.00)
-                .potentialSavings(1850.50)
-                .source("ML")
-                .topSpenders(List.of(
-                    new TopSpenderDTO("az-prod-aks", "Azure_AKS", 4500.0, 36.0),
-                    new TopSpenderDTO("aws-ec2-backend", "AWS_EC2", 3200.0, 25.6),
-                    new TopSpenderDTO("gcp-bigquery-analytics", "GCP_BigQuery", 2100.0, 16.8)
-                ))
-                .build();
-        report.setTenantId(tenantId);
-        financialReportRepository.save(report);
-
-        // 2. Seed Audit Logs (Security/Compliance Issues)
-        AuditLog issue1 = AuditLog.builder()
-                .action("S3_PUBLIC_ACCESS")
-                .resourceId("arn:aws:s3:::optibrain-backups")
+        // --- STORY PILLAR: ANOMALIES & SECURITY ---
+        // Aligns with the "Sudden increase in on-demand EC2 usage" story
+        AuditLog anomalyEvent = AuditLog.builder()
+                .action("EC2_COST_SPIKE_DETECTED")
+                .resourceId("i-023ab-prod")
                 .status(AuditStatus.PENDING)
-                .explanation("Public access detected on backup bucket. Critical security risk.")
+                .explanation("Sudden 116% spike in on-demand compute costs detected in us-east-1. Potential mis-scaled Autoscaling Group.")
                 .savings(0.0)
-                .score(95.0)
+                .score(92.0)
                 .build();
-        issue1.setTenantId(tenantId);
-        
-        AuditLog issue2 = AuditLog.builder()
-                .action("UNRESTRICTED_SSH")
-                .resourceId("sg-08ae32194")
+        anomalyEvent.setTenantId(tenantId);
+
+        AuditLog complianceIssue = AuditLog.builder()
+                .action("S3_UNENCRYPTED_BUCKET")
+                .resourceId("optibrain-archive-2025")
                 .status(AuditStatus.SUCCESS)
-                .explanation("SSH access restricted to internal VPN range.")
+                .explanation("Sensitivity high: Auto-encryption enabled via policy.")
                 .savings(0.0)
-                .score(80.0)
+                .score(100.0)
                 .build();
-        issue2.setTenantId(tenantId);
+        complianceIssue.setTenantId(tenantId);
         
-        auditLogRepository.saveAll(List.of(issue1, issue2));
+        auditLogRepository.saveAll(List.of(anomalyEvent, complianceIssue));
 
-        // 3. Seed Spot Actions (Automation results)
-        SpotAction action1 = SpotAction.builder()
+        // --- STORY PILLAR: RECOMMENDATIONS ---
+        // Aligns with the "Downscale or stop instance" recommendation
+        SpotAction rightsizingRec = SpotAction.builder()
                 .type(ActionType.MIGRATE_TO_SPOT)
-                .resourceId("i-0a2bc4567")
-                .status(SpotStatus.COMPLETED)
-                .predictedSavings(124.50)
-                .build();
-        action1.setTenantId(tenantId);
-        
-        SpotAction action2 = SpotAction.builder()
-                .type(ActionType.DIVERSITY_BALANCE)
-                .resourceId("az-vm-web-04")
+                .resourceId("i-023ab-prod")
                 .status(SpotStatus.PENDING)
-                .predictedSavings(45.20)
+                .predictedSavings(8400.0) // Matches recommendations.json
                 .build();
-        action2.setTenantId(tenantId);
+        rightsizingRec.setTenantId(tenantId);
         
-        spotActionRepository.saveAll(List.of(action1, action2));
+        SpotAction storageRec = SpotAction.builder()
+                .type(ActionType.DIVERSITY_BALANCE)
+                .resourceId("db-prod-rds")
+                .status(SpotStatus.COMPLETED)
+                .predictedSavings(4600.0)
+                .build();
+        storageRec.setTenantId(tenantId);
+        
+        spotActionRepository.saveAll(List.of(rightsizingRec, storageRec));
 
-        // 4. Seed Orphaned Resources (Cleanup recommendations)
-        OrphanedResource orphan1 = OrphanedResource.builder()
-                .resourceId("vol-09876abc")
-                .resourceType("VOLUME")
+        // --- STORY PILLAR: SAVINGS & CLEANUP ---
+        // Aligns with the "Resource cleanup" story
+        OrphanedResource idleVolume = OrphanedResource.builder()
+                .resourceId("vol-0af123")
+                .resourceType("EBS_VOLUME")
                 .region("us-east-1")
-                .estimatedMonthlyCost(35.00)
+                .estimatedMonthlyCost(120.0)
                 .resolved(false)
                 .build();
-        orphan1.setTenantId(tenantId);
+        idleVolume.setTenantId(tenantId);
         
-        OrphanedResource orphan2 = OrphanedResource.builder()
-                .resourceId("snap-44321def")
-                .resourceType("SNAPSHOT")
-                .region("us-east-1")
-                .estimatedMonthlyCost(12.50)
+        OrphanedResource unattachedEIP = OrphanedResource.builder()
+                .resourceId("eipalloc-01234")
+                .resourceType("ELASTIC_IP")
+                .region("us-west-2")
+                .estimatedMonthlyCost(25.0)
                 .resolved(true)
                 .build();
-        orphan2.setTenantId(tenantId);
+        unattachedEIP.setTenantId(tenantId);
         
-        orphanedResourceRepository.saveAll(List.of(orphan1, orphan2));
-
-        log.info("[SEEDER] Successfully seeded 7 demo records.");
+        orphanedResourceRepository.saveAll(List.of(idleVolume, unattachedEIP));
     }
 }

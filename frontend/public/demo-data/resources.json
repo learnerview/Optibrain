@@ -1,0 +1,62 @@
+[
+    {
+        "id": "i-023ab",
+        "name": "EC2 Instance i-023ab",
+        "type": "EC2",
+        "status": "Idle",
+        "monthlyCost": 8400,
+        "region": "ap-south-1",
+        "utilizationPercent": 8,
+        "optimizationCandidate": true
+    },
+    {
+        "id": "db-prod",
+        "name": "RDS MySQL db-prod",
+        "type": "RDS",
+        "status": "Running",
+        "monthlyCost": 31400,
+        "region": "ap-south-1",
+        "utilizationPercent": 65,
+        "optimizationCandidate": true
+    },
+    {
+        "id": "bucket-logs",
+        "name": "S3 Bucket logs",
+        "type": "S3",
+        "status": "Running",
+        "monthlyCost": 21200,
+        "region": "ap-south-1",
+        "utilizationPercent": 100,
+        "optimizationCandidate": false
+    },
+    {
+        "id": "cw-metrics",
+        "name": "CloudWatch Metrics",
+        "type": "CloudWatch",
+        "status": "Running",
+        "monthlyCost": 13450,
+        "region": "ap-south-1",
+        "utilizationPercent": 85,
+        "optimizationCandidate": false
+    },
+    {
+        "id": "i-045cd",
+        "name": "EC2 Instance i-045cd",
+        "type": "EC2",
+        "status": "Running",
+        "monthlyCost": 12500,
+        "region": "ap-south-1",
+        "utilizationPercent": 78,
+        "optimizationCandidate": false
+    },
+    {
+        "id": "i-067ef",
+        "name": "EC2 Instance i-067ef",
+        "type": "EC2",
+        "status": "Orphaned",
+        "monthlyCost": 4200,
+        "region": "us-east-1",
+        "utilizationPercent": 0,
+        "optimizationCandidate": true
+    }
+]

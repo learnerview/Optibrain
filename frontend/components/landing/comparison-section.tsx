@@ -10,7 +10,7 @@ const comparison = [
   { feature: "Anomaly detection", optibrain: true, awsExplorer: true, azureCost: true },
   { feature: "Security + cost correlation", optibrain: true, awsExplorer: false, azureCost: false },
   { feature: "Native cloud integration", optibrain: true, awsExplorer: true, azureCost: true },
-  { feature: "Conversational FinOps AI", optibrain: true, awsExplorer: false, azureCost: false },
+  { feature: "Conversational Cloud Cost Intelligence AI", optibrain: true, awsExplorer: false, azureCost: false },
   { feature: "Policy-as-code automation", optibrain: true, awsExplorer: false, azureCost: false },
   { feature: "Real-time cost tracking", optibrain: true, awsExplorer: true, azureCost: true },
 ]

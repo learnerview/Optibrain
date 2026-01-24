@@ -362,7 +362,7 @@ class ComprehensiveAnalyzer:
         # Role management based on organization size
         allow_role_upgrade = True
         allow_role_downgrade = organization_size in ['large', 'enterprise']
-        max_role_for_upgrade = 'ADMIN' if maturity > 0.6 else 'FINOPS_ANALYST'
+        max_role_for_upgrade = 'ADMIN' if maturity > 0.6 else 'CLOUD_INTELLIGENCE_ANALYST'
         
         # Tenant management
         allow_tenant_creation = True

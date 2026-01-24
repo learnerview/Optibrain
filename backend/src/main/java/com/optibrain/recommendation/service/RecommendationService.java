@@ -20,12 +20,13 @@ import java.util.*;
 
 /**
  * Service for generating and managing cost optimization recommendations
- * Provides autonomous FinOps capabilities with safety controls and RBAC
+ * Provides autonomous Cloud Cost Intelligence capabilities with safety controls and RBAC
  */
 @Service
 @RequiredArgsConstructor
 @Slf4j
-public class RecommendationService {
+@org.springframework.boot.autoconfigure.condition.ConditionalOnProperty(name = "app.demo-mode", havingValue = "false", matchIfMissing = true)
+public class RecommendationService implements OptimizationService {
 
     private final PricingService pricingService;
     private final CloudAdapter cloudAdapter;
@@ -36,9 +37,9 @@ public class RecommendationService {
 
     /**
      * Generates comprehensive rightsizing recommendations based on current metrics
-     * Requires FINOPS_ANALYST role or higher
+     * Requires CLOUD_INTELLIGENCE_ANALYST role or higher
      */
-    @PreAuthorize("hasAnyRole('FINOPS_ANALYST', 'ADMIN', 'OWNER')")
+    @PreAuthorize("hasAnyRole('CLOUD_INTELLIGENCE_ANALYST', 'ADMIN', 'OWNER')")
     public List<Recommendation> generateRightsizing(MetricData metrics) {
         List<Recommendation> recs = new ArrayList<>();
         // Simulate inventory: 3 instances with types
@@ -285,9 +286,9 @@ public class RecommendationService {
 
     /**
      * Approves a recommendation for execution
-     * Requires FINOPS_ANALYST role or higher
+     * Requires CLOUD_INTELLIGENCE_ANALYST role or higher
      */
-    @PreAuthorize("hasAnyRole('FINOPS_ANALYST', 'ADMIN', 'OWNER')")
+    @PreAuthorize("hasAnyRole('CLOUD_INTELLIGENCE_ANALYST', 'ADMIN', 'OWNER')")
     public boolean approve(String id) {
         Recommendation r = store.get(id);
         if (r != null && "PENDING".equals(r.getStatus())) {
@@ -300,9 +301,9 @@ public class RecommendationService {
 
     /**
      * Rejects a recommendation
-     * Requires FINOPS_ANALYST role or higher
+     * Requires CLOUD_INTELLIGENCE_ANALYST role or higher
      */
-    @PreAuthorize("hasAnyRole('FINOPS_ANALYST', 'ADMIN', 'OWNER')")
+    @PreAuthorize("hasAnyRole('CLOUD_INTELLIGENCE_ANALYST', 'ADMIN', 'OWNER')")
     public boolean reject(String id) {
         Recommendation r = store.get(id);
         if (r != null && "PENDING".equals(r.getStatus())) {
@@ -378,6 +379,18 @@ public class RecommendationService {
         // 3. Max-change per hour: limit to 5 executions per hour
         long executionsLastHour = auditService.countExecutionsInLastHour();
         return executionsLastHour < 5;
+    }
+    @Override
+    public List<Map<String, Object>> getRecommendations() {
+        // Simple bridge for the contract
+        return listPending().stream()
+            .map(r -> Map.<String, Object>of(
+                "resource", r.getResourceId(),
+                "issue", r.getReason(),
+                "recommendation", r.getAction(),
+                "monthlySavings", r.getMonthlySavings()
+            ))
+            .toList();
     }
 
     /**

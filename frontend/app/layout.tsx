@@ -8,8 +8,8 @@ const _geist = Geist({ subsets: ["latin"] })
 const _geistMono = Geist_Mono({ subsets: ["latin"] })
 
 export const metadata: Metadata = {
-  title: "OptiBrain - AI-Powered FinOps Platform",
-  description: "Intelligent multi-cloud cost optimization and financial operations management",
+  title: "OptiBrain - AI-Powered Cloud Cost Intelligence Platform",
+  description: "Intelligent multi-cloud cost optimization and cloud cost intelligence",
   generator: "v0.app",
   viewport: {
     width: "device-width",

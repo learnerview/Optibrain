@@ -17,7 +17,7 @@ public class LocalAIServiceImpl implements AIService {
         } else if (msg.contains("anomaly") || msg.contains("alert") || msg.contains("issue")) {
             return "I detected a small memory spike in 'prod-db-01' at 08:00 AM today. It has since stabilized. No critical anomalies currently.";
         } else if (msg.contains("hello") || msg.contains("hi")) {
-            return "Hello! I am OptiBrain, your autonomous FinOps assistant. How can I help you optimize your cloud today?";
+            return "Hello! I am OptiBrain, your autonomous Cloud Cost Intelligence assistant. How can I help you optimize your cloud today?";
         } else {
             return "I am a local AI assistant. I can help with Cost Analysis, Policy Configuration, and Anomaly Detection. Try asking 'What are my costs?' or 'Check my policies'.";
         }

@@ -1,0 +1,10 @@
+{
+    "monthlySavings": 13000,
+    "annualSavings": 156000,
+    "confidence": "94%",
+    "assumptions": [
+        "Idle resources removed",
+        "No increase in traffic",
+        "Stable workload pattern"
+    ]
+}

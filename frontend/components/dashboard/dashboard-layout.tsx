@@ -14,6 +14,7 @@ import {
   Sliders,
   Network,
   TrendingDown,
+  TrendingUp,
   BarChart3,
   Settings,
   LogOut,
@@ -21,6 +22,11 @@ import {
   Zap,
   User,
   Cloud,
+  Package,
+  History,
+  Bell,
+  FileText,
+  MessageSquare,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 
@@ -28,26 +34,17 @@ interface DashboardLayoutProps {
   children: React.ReactNode
 }
 
-const mainMenuItems = [
-  { icon: LayoutDashboard, label: "Dashboard", href: "/dashboard" },
-  { icon: CheckCircle2, label: "Decisions", href: "/dashboard/decisions" },
-  { icon: Network, label: "Infrastructure", href: "/dashboard/infrastructure" },
-  { icon: BarChart3, label: "Savings", href: "/dashboard/savings" },
-]
-
-const aiFeatureMenuItems = [
-  { icon: Brain, label: "AI Copilot", href: "/dashboard/copilot" },
-  { icon: Sliders, label: "Simulator", href: "/dashboard/simulator" },
+const menuItems = [
+  { icon: LayoutDashboard, label: "Overview", href: "/dashboard" },
+  { icon: MessageSquare, label: "AI Copilot", href: "/dashboard/chat" },
+  { icon: TrendingUp, label: "Cost Explorer", href: "/dashboard/cost-explorer" },
   { icon: AlertCircle, label: "Anomalies", href: "/dashboard/anomalies" },
-  { icon: TrendingDown, label: "Predictions", href: "/dashboard/forecasting" },
-]
-
-const systemMenuItems = [
-  { icon: Zap, label: "Automation", href: "/dashboard/automation" },
-  { icon: BarChart3, label: "Reports", href: "/dashboard/reports" },
-  { icon: Cloud, label: "Cloud Connections", href: "/dashboard/cloud-connections" },
-  { icon: User, label: "Account", href: "/dashboard/account" },
-  { icon: Settings, label: "Settings", href: "/dashboard/settings" },
+  { icon: Package, label: "Resources", href: "/dashboard/resources" },
+  { icon: CheckCircle2, label: "Recommendations", href: "/dashboard/recommendations" },
+  { icon: History, label: "Optimizations", href: "/dashboard/optimizations" },
+  { icon: BarChart3, label: "Savings", href: "/dashboard/savings" },
+  { icon: Bell, label: "Alerts", href: "/dashboard/alerts" },
+  { icon: FileText, label: "Reports", href: "/dashboard/reports" },
 ]
 
 export default function DashboardLayout({ children }: DashboardLayoutProps) {
@@ -82,9 +79,8 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
     <div className="min-h-screen bg-background">
       {/* Sidebar */}
       <aside
-        className={`fixed left-0 top-0 h-screen bg-sidebar border-r border-sidebar-border glass z-40 transition-all duration-300 overflow-y-auto ${
-          sidebarCollapsed ? "w-20" : "w-64"
-        }`}
+        className={`fixed left-0 top-0 h-screen bg-sidebar border-r border-sidebar-border glass z-40 transition-all duration-300 overflow-y-auto ${sidebarCollapsed ? "w-20" : "w-64"
+          }`}
         onMouseEnter={() => setSidebarCollapsed(false)}
         onMouseLeave={() => setSidebarCollapsed(true)}
       >
@@ -97,11 +93,11 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
           </Link>
         </div>
 
-        {/* Main Navigation */}
+        {/* Navigation */}
         <div className={`mb-6 ${sidebarCollapsed ? "px-2" : "px-4"}`}>
-          {!sidebarCollapsed && <p className="text-xs font-semibold text-sidebar-foreground/60 uppercase mb-3">Main</p>}
+          {!sidebarCollapsed && <p className="text-xs font-semibold text-sidebar-foreground/60 uppercase mb-3">Cloud Cost Intelligence</p>}
           <nav className="space-y-1">
-            {mainMenuItems.map((item) => {
+            {menuItems.map((item: any) => {
               const Icon = item.icon
               return (
                 <Link
@@ -117,74 +113,6 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
             })}
           </nav>
         </div>
-
-        {/* AI Features */}
-        <div className={`mb-6 ${sidebarCollapsed ? "px-2" : "px-4"}`}>
-          {!sidebarCollapsed && <p className="text-xs font-semibold text-sidebar-foreground/60 uppercase mb-3">AI</p>}
-          <nav className="space-y-1">
-            {aiFeatureMenuItems.map((item) => {
-              const Icon = item.icon
-              return (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  title={sidebarCollapsed ? item.label : ""}
-                  className="flex items-center gap-3 px-3 py-2 rounded-lg text-sidebar-foreground hover:bg-sidebar-accent/20 transition-colors group"
-                >
-                  <Icon className="w-5 h-5 text-sidebar-primary group-hover:text-sidebar-accent flex-shrink-0" />
-                  {!sidebarCollapsed && <span className="text-sm font-medium">{item.label}</span>}
-                </Link>
-              )
-            })}
-          </nav>
-        </div>
-
-        {/* Cloud & System */}
-        <div className={`mb-6 pb-6 border-b border-sidebar-border ${sidebarCollapsed ? "px-2" : "px-4"}`}>
-          {!sidebarCollapsed && <p className="text-xs font-semibold text-sidebar-foreground/60 uppercase mb-3">Cloud</p>}
-          <nav className="space-y-1">
-            {systemMenuItems.map((item) => {
-              const Icon = item.icon
-              return (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  title={sidebarCollapsed ? item.label : ""}
-                  className="flex items-center gap-3 px-3 py-2 rounded-lg text-sidebar-foreground hover:bg-sidebar-accent/20 transition-colors group"
-                >
-                  <Icon className="w-5 h-5 text-sidebar-primary group-hover:text-sidebar-accent flex-shrink-0" />
-                  {!sidebarCollapsed && <span className="text-sm font-medium">{item.label}</span>}
-                </Link>
-              )
-            })}
-          </nav>
-        </div>
-
-        {/* Cloud provider selector */}
-        {!sidebarCollapsed && (
-          <div className={`mb-6 ${sidebarCollapsed ? "px-2" : "px-4"}`}>
-            <p className="text-xs font-semibold text-sidebar-foreground/60 uppercase mb-3">Connected</p>
-            {providers.length > 0 ? (
-              <div className="space-y-2">
-                {providers.map((provider) => (
-                  <button
-                    key={provider.id}
-                    onClick={() => selectProvider(provider.id)}
-                    className={`w-full text-left px-3 py-2 rounded-lg text-sm font-medium transition ${
-                      selectedProvider === provider.id
-                        ? "bg-sidebar-accent text-sidebar-accent-foreground"
-                        : "text-sidebar-foreground hover:bg-sidebar-accent/20"
-                    }`}
-                  >
-                    {provider.name}
-                  </button>
-                ))}
-              </div>
-            ) : (
-              <p className="text-xs text-sidebar-foreground/50">No providers</p>
-            )}
-          </div>
-        )}
 
         {/* User menu */}
         <div className={`border-t border-sidebar-border pt-4 ${sidebarCollapsed ? "px-2" : "px-4"}`}>
@@ -264,41 +192,13 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                       </div>
                     </div>
 
-                    {/* Menu Items */}
-                    <Link
-                      href="/dashboard/account"
-                      onClick={() => setDropdownOpen(false)}
-                      className="flex items-center gap-2 px-4 py-2.5 text-sm text-slate-300 hover:bg-slate-800 transition border-b border-slate-800/50"
-                    >
-                      <User className="w-4 h-4 text-slate-400" />
-                      Organization & Team
-                    </Link>
-
-                    <Link
-                      href="/dashboard/settings"
-                      onClick={() => setDropdownOpen(false)}
-                      className="flex items-center gap-2 px-4 py-2.5 text-sm text-slate-300 hover:bg-slate-800 transition border-b border-slate-800/50"
-                    >
-                      <Settings className="w-4 h-4 text-slate-400" />
-                      Account Settings
-                    </Link>
-
-                    <Link
-                      href="/dashboard/api-keys"
-                      onClick={() => setDropdownOpen(false)}
-                      className="flex items-center gap-2 px-4 py-2.5 text-sm text-slate-300 hover:bg-slate-800 transition border-b border-slate-800/50"
-                    >
-                      <Zap className="w-4 h-4 text-slate-400" />
-                      API Keys
-                    </Link>
-
                     {/* Sign Out */}
                     <button
                       onClick={() => {
                         setDropdownOpen(false)
                         handleLogout()
                       }}
-                      className="w-full flex items-center gap-2 px-4 py-2.5 text-sm text-red-400 hover:bg-red-500/10 transition text-left"
+                      className="w-full flex items-center gap-2 px-4 py-3 text-sm text-red-400 hover:bg-red-500/10 transition text-left"
                     >
                       <LogOut className="w-4 h-4" />
                       Sign Out

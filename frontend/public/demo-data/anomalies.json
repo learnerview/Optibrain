@@ -1,0 +1,9 @@
+{
+    "anomalyDetected": true,
+    "severity": "HIGH",
+    "date": "2026-01-14",
+    "service": "EC2",
+    "expectedCost": 4200,
+    "actualCost": 9100,
+    "reason": "Sudden increase in on-demand EC2 usage"
+}

@@ -31,7 +31,7 @@ export default function AuthLayout({ children }: { children: ReactNode }) {
               <span className="text-2xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
                 OptiBrain
               </span>
-              <div className="text-xs text-muted-foreground">Autonomous FinOps OS</div>
+              <div className="text-xs text-muted-foreground">Autonomous Cloud Cost Intelligence OS</div>
             </div>
           </div>
 
