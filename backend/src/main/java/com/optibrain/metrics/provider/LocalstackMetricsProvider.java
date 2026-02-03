@@ -16,33 +16,34 @@ import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.*;
 
+/**
+ * LocalStack Metrics Provider
+ * 
+ * Provides metrics from LocalStack for local development and testing.
+ * Uses hardcoded "test" credentials which is acceptable for LocalStack.
+ */
 @Component("localstackMetricsProvider")
 @Slf4j
 public class LocalstackMetricsProvider implements MetricsProvider {
 
     private final String endpoint;
     private final String region;
-    private final String accessKey;
-    private final String secretKey;
 
     public LocalstackMetricsProvider(
             @org.springframework.beans.factory.annotation.Value("${cloud.localstack.endpoint}") String endpoint,
-            @org.springframework.beans.factory.annotation.Value("${cloud.localstack.region}") String region,
-            @org.springframework.beans.factory.annotation.Value("${aws.access-key}") String accessKey,
-            @org.springframework.beans.factory.annotation.Value("${aws.secret-key}") String secretKey) {
+            @org.springframework.beans.annotation.Value("${cloud.localstack.region}") String region) {
         this.endpoint = endpoint;
         this.region = region;
-        this.accessKey = accessKey;
-        this.secretKey = secretKey;
     }
 
     private CloudWatchClient getClient() {
+        // LocalStack always uses "test" credentials - this is expected and documented
         return CloudWatchClient.builder()
                 .region(Region.of(region))
                 .endpointOverride(URI.create(endpoint))
                 .credentialsProvider(
                         StaticCredentialsProvider.create(
-                                AwsBasicCredentials.create(accessKey, secretKey)
+                                AwsBasicCredentials.create("test", "test")
                         )
                 )
                 .build();

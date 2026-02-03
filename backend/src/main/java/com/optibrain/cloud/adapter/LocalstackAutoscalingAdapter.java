@@ -12,33 +12,34 @@ import software.amazon.awssdk.services.autoscaling.model.*;
 import java.net.URI;
 import java.util.List;
 
+/**
+ * LocalStack Auto Scaling Adapter
+ * 
+ * Provides Auto Scaling Group management for LocalStack testing.
+ * Uses hardcoded "test" credentials which is acceptable for LocalStack.
+ */
 @Component("localstackAutoscalingAdapter")
 @Slf4j
 public class LocalstackAutoscalingAdapter {
 
     private final String endpoint;
     private final String region;
-    private final String accessKey;
-    private final String secretKey;
 
     public LocalstackAutoscalingAdapter(
             @Value("${cloud.localstack.endpoint}") String endpoint,
-            @Value("${cloud.localstack.region}") String region,
-            @Value("${aws.access-key}") String accessKey,
-            @Value("${aws.secret-key}") String secretKey) {
+            @Value("${cloud.localstack.region}") String region) {
         this.endpoint = endpoint;
         this.region = region;
-        this.accessKey = accessKey;
-        this.secretKey = secretKey;
     }
 
     private AutoScalingClient getClient() {
+        // LocalStack always uses "test" credentials - this is expected and documented
         return AutoScalingClient.builder()
                 .region(Region.of(region))
                 .endpointOverride(URI.create(endpoint))
                 .credentialsProvider(
                         StaticCredentialsProvider.create(
-                                AwsBasicCredentials.create(accessKey, secretKey)
+                                AwsBasicCredentials.create("test", "test")
                         )
                 )
                 .build();
