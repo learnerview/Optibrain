@@ -1,5 +1,6 @@
 package com.optibrain.dashboard.service;
 
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
 
 import java.util.HashMap;
@@ -9,6 +10,7 @@ import java.util.Map;
  * Implementation of DashboardOverviewService
  */
 @Service
+@ConditionalOnProperty(name = "app.demo-mode", havingValue = "true")
 public class DashboardOverviewServiceImpl implements DashboardOverviewService {
     
     @Override
