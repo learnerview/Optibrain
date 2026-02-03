@@ -11,17 +11,29 @@ import com.optibrain.cleanup.model.OrphanedResource;
 import com.optibrain.cleanup.repository.OrphanedResourceRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.CommandLineRunner;
+import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
 
 /**
- * DataSeeder for OptiBrain Demo Mode.
- * Seeds the 4 vertical demo pillars with consistent, deterministic data.
- * Pruned of unstable ML/FinancialReport entities for hackathon stability.
+ * DataSeeder for OptiBrain Development and Demo Mode.
+ * 
+ * WARNING: This component is ONLY active in 'dev' profile.
+ * It seeds sample data for testing and demonstration purposes.
+ * 
+ * PRODUCTION: This seeder will NOT run in production profile.
+ * Real production data should come from:
+ * - AWS API calls (Cost Explorer, CloudWatch, EC2, etc.)
+ * - User-created optimization rules
+ * - Actual resource discovery and analysis
+ * 
+ * To disable in development: Set spring.profiles.active=prod
  */
 @Component
+@Profile("dev")  // Only run in development profile
 @Slf4j
 @RequiredArgsConstructor
 public class DataSeeder implements CommandLineRunner {
@@ -29,35 +41,44 @@ public class DataSeeder implements CommandLineRunner {
     private final AuditLogRepository auditLogRepository;
     private final SpotActionRepository spotActionRepository;
     private final OrphanedResourceRepository orphanedResourceRepository;
+    
+    @Value("${app.demo-mode:false}")
+    private boolean demoMode;
 
     @Override
     public void run(String... args) {
-        log.info("🚀 [DEMO-SEEDER] Initializing OptiBrain Story Data...");
+        if (!demoMode) {
+            log.info("ℹ️ [DATA-SEEDER] Demo mode disabled. Skipping sample data generation.");
+            return;
+        }
+        
+        log.info("🚀 [DATA-SEEDER] Demo mode enabled. Initializing sample data for development...");
         
         if (auditLogRepository.count() == 0) {
-            seedStoryData();
-            log.info("✅ [DEMO-SEEDER] Story Data Seeded Successfully.");
+            seedDevelopmentData();
+            log.info("✅ [DATA-SEEDER] Development sample data seeded successfully.");
         } else {
-            log.info("ℹ️ [DEMO-SEEDER] Data already exists. Skipping initialization.");
+            log.info("ℹ️ [DATA-SEEDER] Data already exists. Skipping initialization.");
         }
     }
 
     /**
-     * Seeds the demo story:
-     * 1. A High-Severity Anomaly (AuditLog)
-     * 2. A Corresponding Recommendation (SpotAction)
-     * 3. Cleanup Actions (OrphanedResource)
+     * Seeds sample data for development and demonstration:
+     * 1. Sample audit logs (anomaly detection, compliance)
+     * 2. Sample optimization recommendations
+     * 3. Sample cleanup opportunities
+     * 
+     * This data mimics what real AWS discovery would produce.
      */
-    private void seedStoryData() {
-        String tenantId = "demo-tenant";
+    private void seedDevelopmentData() {
+        String tenantId = "default-tenant";
 
-        // --- STORY PILLAR: ANOMALIES & SECURITY ---
-        // Aligns with the "Sudden increase in on-demand EC2 usage" story
+        // --- SAMPLE: ANOMALIES & AUDIT LOGS ---
         AuditLog anomalyEvent = AuditLog.builder()
                 .action("EC2_COST_SPIKE_DETECTED")
-                .resourceId("i-023ab-prod")
+                .resourceId("i-023ab-sample")
                 .status(AuditStatus.PENDING)
-                .explanation("Sudden 116% spike in on-demand compute costs detected in us-east-1. Potential mis-scaled Autoscaling Group.")
+                .explanation("Sample: Sudden 116% spike in compute costs. This would be detected from real CloudWatch metrics.")
                 .savings(0.0)
                 .score(92.0)
                 .build();
@@ -65,9 +86,9 @@ public class DataSeeder implements CommandLineRunner {
 
         AuditLog complianceIssue = AuditLog.builder()
                 .action("S3_UNENCRYPTED_BUCKET")
-                .resourceId("optibrain-archive-2025")
+                .resourceId("sample-bucket-2025")
                 .status(AuditStatus.SUCCESS)
-                .explanation("Sensitivity high: Auto-encryption enabled via policy.")
+                .explanation("Sample: Unencrypted S3 bucket detected. Auto-encryption would be recommended.")
                 .savings(0.0)
                 .score(100.0)
                 .build();
@@ -75,19 +96,18 @@ public class DataSeeder implements CommandLineRunner {
         
         auditLogRepository.saveAll(List.of(anomalyEvent, complianceIssue));
 
-        // --- STORY PILLAR: RECOMMENDATIONS ---
-        // Aligns with the "Downscale or stop instance" recommendation
+        // --- SAMPLE: OPTIMIZATION RECOMMENDATIONS ---
         SpotAction rightsizingRec = SpotAction.builder()
                 .type(ActionType.MIGRATE_TO_SPOT)
-                .resourceId("i-023ab-prod")
+                .resourceId("i-023ab-sample")
                 .status(SpotStatus.PENDING)
-                .predictedSavings(8400.0) // Matches recommendations.json
+                .predictedSavings(8400.0)
                 .build();
         rightsizingRec.setTenantId(tenantId);
         
         SpotAction storageRec = SpotAction.builder()
                 .type(ActionType.DIVERSITY_BALANCE)
-                .resourceId("db-prod-rds")
+                .resourceId("sample-db-rds")
                 .status(SpotStatus.COMPLETED)
                 .predictedSavings(4600.0)
                 .build();
@@ -95,10 +115,9 @@ public class DataSeeder implements CommandLineRunner {
         
         spotActionRepository.saveAll(List.of(rightsizingRec, storageRec));
 
-        // --- STORY PILLAR: SAVINGS & CLEANUP ---
-        // Aligns with the "Resource cleanup" story
+        // --- SAMPLE: CLEANUP OPPORTUNITIES ---
         OrphanedResource idleVolume = OrphanedResource.builder()
-                .resourceId("vol-0af123")
+                .resourceId("vol-sample123")
                 .resourceType("EBS_VOLUME")
                 .region("us-east-1")
                 .estimatedMonthlyCost(120.0)
@@ -107,7 +126,7 @@ public class DataSeeder implements CommandLineRunner {
         idleVolume.setTenantId(tenantId);
         
         OrphanedResource unattachedEIP = OrphanedResource.builder()
-                .resourceId("eipalloc-01234")
+                .resourceId("eipalloc-sample")
                 .resourceType("ELASTIC_IP")
                 .region("us-west-2")
                 .estimatedMonthlyCost(25.0)
@@ -116,5 +135,8 @@ public class DataSeeder implements CommandLineRunner {
         unattachedEIP.setTenantId(tenantId);
         
         orphanedResourceRepository.saveAll(List.of(idleVolume, unattachedEIP));
+        
+        log.info("📊 [DATA-SEEDER] Seeded: {} audit logs, {} recommendations, {} cleanup items",
+                2, 2, 2);
     }
 }

@@ -1,14 +1,12 @@
 package com.optibrain.cloud.adapter;
 
 import com.optibrain.cloud.config.CloudConfig;
+import com.optibrain.cloud.service.CredentialService;
 import com.optibrain.policy.model.Policy;
 import com.optibrain.policy.service.PolicyService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
-import software.amazon.awssdk.auth.credentials.AwsBasicCredentials;
-import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider;
 import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.ec2.Ec2Client;
 import software.amazon.awssdk.services.ec2.model.*;
@@ -26,10 +24,7 @@ public class AwsCloudAdapter implements CloudAdapter {
 
     private final PolicyService policyService;
     private final CloudConfig cloudConfig;
-    @Value("${aws.access-key}")
-    private String accessKey;
-    @Value("${aws.secret-key}")
-    private String secretKey;
+    private final CredentialService credentialService;
 
     @Override
     public String getProviderName() {
@@ -40,11 +35,8 @@ public class AwsCloudAdapter implements CloudAdapter {
         Policy policy = policyService.getCurrentPolicy();
         var builder = Ec2Client.builder()
                 .region(Region.of(policy.getRegion()))
-                .credentialsProvider(
-                        StaticCredentialsProvider.create(
-                                AwsBasicCredentials.create(accessKey, secretKey)
-                        )
-                );
+                .credentialsProvider(credentialService.createCredentialsProvider(null, null));
+        
         if ("LOCALSTACK".equalsIgnoreCase(cloudConfig.getMode())) {
             builder.endpointOverride(URI.create(cloudConfig.getLocalstack().getEndpoint()));
         }

@@ -1,5 +1,7 @@
 # OptiBrain: AWS Cost Optimization & Resource Automation Platform
 
+⚠️ **IMPORTANT**: OptiBrain can modify, stop, and terminate AWS resources. Read [SECURITY.md](SECURITY.md) before deploying to production.
+
 A production-ready AWS cost intelligence platform that analyzes cloud usage patterns, detects inefficiencies, and provides actionable optimization recommendations to reduce your AWS bill by 20-40%.
 
 ## 🎯 Key Features
@@ -23,6 +25,27 @@ A production-ready AWS cost intelligence platform that analyzes cloud usage patt
 - **IAM Integration**: Least-privilege access with provided IAM policies
 - **Audit Logging**: Complete trail of all cost-saving actions
 - **Environment-Based Config**: Separate configurations for dev/staging/production
+
+---
+
+## 🔐 Security & Safety First
+
+**OptiBrain operates in DRY-RUN mode by default.** No AWS resources will be modified until you explicitly enable it.
+
+### Required Reading Before Production
+
+1. **[SECURITY.md](SECURITY.md)** - Complete security guide, risks, and safety measures
+2. **[IAM_POLICY.md](IAM_POLICY.md)** - Minimum required AWS permissions
+
+### Quick Safety Checklist
+
+- ✅ Dry-run mode enabled: `cloud.dryRun=true` (default)
+- ✅ Protected resources configured
+- ✅ IAM least-privilege permissions applied
+- ✅ AWS CloudTrail enabled for audit logging
+- ✅ Tested in sandbox AWS account first
+
+See [SECURITY.md](SECURITY.md) for complete details.
 
 ---
 
@@ -114,21 +137,29 @@ aws.secret-key=test
 
 ### Using Real AWS (Production)
 
-#### Option 1: Environment Variables (Recommended for Production)
+⚠️ **Production Deployment Requires**:
+- Read [SECURITY.md](SECURITY.md) completely
+- Test in sandbox AWS account first
+- Start with read-only IAM permissions
+- Keep dry-run mode enabled initially
+
+#### Option 1: Environment Variables (Recommended for Docker/Kubernetes)
 ```bash
 export AWS_ACCESS_KEY_ID=your_access_key
 export AWS_SECRET_ACCESS_KEY=your_secret_key
 export AWS_REGION=us-east-1
 export CLOUD_MODE=AWS
+export CLOUD_DRY_RUN=true  # Start with dry-run enabled
 ```
 
 #### Option 2: IAM Role (Best Practice for EC2/ECS/Lambda)
-When running on AWS infrastructure, attach an IAM role with the policies from [IAM_POLICY.md](IAM_POLICY.md).
+When running on AWS infrastructure, attach an IAM role with the policies from [IAM_POLICY.md](IAM_POLICY.md). No credentials needed.
 
 ```properties
 # backend/src/main/resources/application-prod.properties
 cloud.mode=AWS
 cloud.aws.region=us-east-1
+cloud.dryRun=true  # Start with dry-run enabled
 # No credentials needed - will use IAM role
 ```
 
@@ -140,6 +171,8 @@ aws_access_key_id = your_access_key
 aws_secret_access_key = your_secret_key
 region = us-east-1
 ```
+
+**NEVER commit AWS credentials to version control!**
 
 ### Required IAM Permissions
 See [IAM_POLICY.md](IAM_POLICY.md) for:
@@ -273,14 +306,70 @@ Logs are written to console by default. Configure log aggregation in production:
 
 ## 🛡️ Security Best Practices
 
+**Before running in production, read [SECURITY.md](SECURITY.md) completely.**
+
 1. **Never commit AWS credentials** to version control
 2. **Use IAM roles** when running on AWS infrastructure
 3. **Enable MFA** for IAM users with powerful permissions
 4. **Rotate credentials** every 90 days
 5. **Enable CloudTrail** to audit all API calls
-6. **Test with read-only policy** before granting write access
-7. **Enable dry-run mode** (\`cloud.dryRun=true\`) in production initially
+6. **Test with read-only policy** before granting write access (see [IAM_POLICY.md](IAM_POLICY.md))
+7. **Enable dry-run mode** (`cloud.dryRun=true`) in production initially
 8. **Use separate AWS accounts** for dev, staging, and production
+9. **Configure protected resources** to prevent accidental deletion
+10. **Monitor all OptiBrain actions** via CloudTrail and application logs
+
+### Deployment Risks
+
+OptiBrain can perform these HIGH-RISK operations when dry-run is disabled:
+- ❌ **Terminate EC2 instances** (permanent data loss)
+- ❌ **Delete EBS volumes** (permanent data loss)
+- ❌ **Stop RDS databases** (service interruption)
+- ❌ **Delete Elastic IPs** (IP address changes)
+
+See [SECURITY.md](SECURITY.md) for complete risk assessment and mitigation strategies.
+
+---
+
+---
+
+## ⚙️ Environment Variables
+
+### Backend (Spring Boot)
+
+Copy `backend/.env.example` to `backend/.env` and configure:
+
+| Variable | Required | Default | Description |
+|----------|----------|---------|-------------|
+| `SPRING_PROFILES_ACTIVE` | No | `dev` | Profile: `dev` or `prod` |
+| `CLOUD_MODE` | No | `LOCALSTACK` | Cloud mode: `LOCALSTACK`, `AWS` |
+| `AWS_REGION` | No | `us-east-1` | AWS region |
+| `AWS_ACCESS_KEY_ID` | Production only | - | AWS access key (use IAM roles instead) |
+| `AWS_SECRET_ACCESS_KEY` | Production only | - | AWS secret key (use IAM roles instead) |
+| `DB_PASSWORD` | Production only | - | Database password |
+| `ADMIN_PASSWORD` | Production only | - | Admin user password |
+| `USER_PASSWORD` | Production only | - | Regular user password |
+
+### ML Service (Python/FastAPI)
+
+Copy `ml-service/.env.example` to `ml-service/.env` and configure:
+
+| Variable | Required | Default | Description |
+|----------|----------|---------|-------------|
+| `GEMINI_API_KEY` | Yes (for AI features) | - | Google Gemini API key |
+| `DATABASE_URL` | No | PostgreSQL local | Database connection string |
+| `JAVA_BACKEND_URL` | No | `http://localhost:8080` | Backend API URL |
+
+Get Gemini API key: https://makersuite.google.com/app/apikey
+
+### Frontend (Next.js)
+
+Copy `frontend/.env.example` to `frontend/.env.local` and configure:
+
+| Variable | Required | Default | Description |
+|----------|----------|---------|-------------|
+| `NEXT_PUBLIC_API_URL` | No | `http://localhost:8080` | Backend API URL |
+| `NEXT_PUBLIC_ML_SERVICE_URL` | No | `http://localhost:8000` | ML Service URL |
 
 ---
 
