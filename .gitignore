@@ -1,3 +1,73 @@
-node_modules/
+# IDEs
 .idea/
+.vscode/
+*.iml
+*.iws
+*.ipr
+
+# Build outputs
+target/
+build/
+dist/
+*.class
+*.jar
+*.war
+!.mvn/wrapper/*.jar
+
+# Dependencies
+node_modules/
+.pnp
+.pnp.js
+
+# Logs
 *.log
+logs/
+backend/*.log
+backend/run_log*.txt
+backend/build_output.txt
+frontend/build_log.txt
+frontend/dev_log*.txt
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+*.egg-info/
+.pytest_cache/
+.coverage
+
+# Temporary files
+*.tmp
+*.temp
+*.swp
+*.swo
+*~
+/tmp/
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+
+# Environment variables (keep template, ignore actual)
+.env
+.env.local
+.env.*.local
+!.env.example
+
+# Next.js
+.next/
+out/
+
+# Package manager lock files (keep one, ignore others)
+pnpm-lock.yaml
+yarn.lock
