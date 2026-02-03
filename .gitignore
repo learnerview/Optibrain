@@ -12,6 +12,7 @@ dist/
 *.class
 *.jar
 *.war
+!.mvn/wrapper/*.jar
 
 # Dependencies
 node_modules/
