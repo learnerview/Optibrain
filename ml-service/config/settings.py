@@ -9,10 +9,10 @@ class Settings(BaseSettings):
     DEBUG: bool = True
     
     # Database Configuration
-    DATABASE_URL: str = "postgresql://postgres:password@localhost:5432/optibrain_ml"
+    DATABASE_URL: str = os.getenv("DATABASE_URL", "postgresql://postgres:postgres@localhost:5432/optibrain_ml")
     
     # Redis Configuration
-    REDIS_URL: str = "redis://localhost:6379/0"
+    REDIS_URL: str = os.getenv("REDIS_URL", "redis://localhost:6379/0")
     
     # ML Model Configuration
     MODEL_CACHE_TTL: int = 3600  # 1 hour
@@ -38,8 +38,8 @@ class Settings(BaseSettings):
     LOG_FILE: str = "logs/ml_service.log"
     
     # Gemini API Configuration
-    GEMINI_API_KEY: str = "AIzaSyCESW_0GwkqGk6jLvjeKmlJ5AMYG08MllQ"
-    GEMINI_MODEL: str = "gemini-pro"
+    GEMINI_API_KEY: str = os.getenv("GEMINI_API_KEY", "")
+    GEMINI_MODEL: str = os.getenv("GEMINI_MODEL", "gemini-pro")
     
     class Config:
         env_file = ".env"
