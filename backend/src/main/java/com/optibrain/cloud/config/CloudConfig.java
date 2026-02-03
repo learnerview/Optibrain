@@ -8,7 +8,7 @@ import org.springframework.context.annotation.Configuration;
 @ConfigurationProperties(prefix = "cloud")
 @Data
 public class CloudConfig {
-    private String mode = "MOCK"; // MOCK | LOCALSTACK | PROMETHEUS | AWS
+    private String mode = "LOCALSTACK"; // LOCALSTACK | PROMETHEUS | AWS
     private Localstack localstack = new Localstack();
     private boolean dryRun = true; // Safety: default to dry-run
 

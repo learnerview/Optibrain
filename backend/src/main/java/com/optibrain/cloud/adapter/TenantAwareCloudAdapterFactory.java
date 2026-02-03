@@ -46,9 +46,33 @@ public class TenantAwareCloudAdapterFactory {
     
     public static class TenantAwareAwsAdapter implements CloudAdapter {
         private final Tenant tenant;
+        private final software.amazon.awssdk.services.ec2.Ec2Client ec2Client;
         
         public TenantAwareAwsAdapter(Tenant tenant) {
             this.tenant = tenant;
+            this.ec2Client = createEc2Client();
+        }
+        
+        private software.amazon.awssdk.services.ec2.Ec2Client createEc2Client() {
+            var credentials = tenant.getCredentials();
+            if (credentials == null || credentials.getAccessKey() == null || credentials.getSecretKey() == null) {
+                throw new IllegalStateException("AWS credentials not configured for tenant: " + tenant.getId());
+            }
+            
+            software.amazon.awssdk.auth.credentials.AwsBasicCredentials awsCreds = 
+                software.amazon.awssdk.auth.credentials.AwsBasicCredentials.create(
+                    credentials.getAccessKey(), 
+                    credentials.getSecretKey()
+                );
+            
+            software.amazon.awssdk.regions.Region region = software.amazon.awssdk.regions.Region.of(
+                tenant.getRegion() != null ? tenant.getRegion() : "us-east-1"
+            );
+            
+            return software.amazon.awssdk.services.ec2.Ec2Client.builder()
+                .region(region)
+                .credentialsProvider(software.amazon.awssdk.auth.credentials.StaticCredentialsProvider.create(awsCreds))
+                .build();
         }
         
         @Override
@@ -58,50 +82,130 @@ public class TenantAwareCloudAdapterFactory {
         
         @Override
         public java.util.List<String> discoverInstances() {
-            return java.util.List.of("i-1234567890abcdef0", "i-0987654321fedcba9");
+            try {
+                software.amazon.awssdk.services.ec2.model.DescribeInstancesResponse response = 
+                    ec2Client.describeInstances();
+                return response.reservations().stream()
+                    .flatMap(r -> r.instances().stream())
+                    .map(software.amazon.awssdk.services.ec2.model.Instance::instanceId)
+                    .collect(java.util.stream.Collectors.toList());
+            } catch (Exception e) {
+                log.error("[TENANT:{}] Failed to discover instances: {}", tenant.getId(), e.getMessage());
+                return java.util.List.of();
+            }
         }
         
         @Override
         public boolean scaleUp(String resourceId) {
-            log.info("[TENANT:{}] Scaling UP {}", tenant.getId(), resourceId);
+            log.info("[TENANT:{}] Scaling UP {} - Auto-scaling via ASG not implemented", tenant.getId(), resourceId);
+            // TODO: Implement auto-scaling group desired capacity update
             return true;
         }
         
         @Override
         public boolean scaleDown(String resourceId) {
-            log.info("[TENANT:{}] Scaling DOWN {}", tenant.getId(), resourceId);
+            log.info("[TENANT:{}] Scaling DOWN {} - Auto-scaling via ASG not implemented", tenant.getId(), resourceId);
+            // TODO: Implement auto-scaling group desired capacity update
             return true;
         }
         
         @Override
         public boolean terminateResource(String resourceId) {
-            log.info("[TENANT:{}] Terminating {}", tenant.getId(), resourceId);
-            return true;
+            try {
+                log.info("[TENANT:{}] Terminating resource {}", tenant.getId(), resourceId);
+                software.amazon.awssdk.services.ec2.model.TerminateInstancesRequest request = 
+                    software.amazon.awssdk.services.ec2.model.TerminateInstancesRequest.builder()
+                        .instanceIds(resourceId)
+                        .build();
+                ec2Client.terminateInstances(request);
+                return true;
+            } catch (Exception e) {
+                log.error("[TENANT:{}] Failed to terminate {}: {}", tenant.getId(), resourceId, e.getMessage());
+                return false;
+            }
         }
         
         @Override
         public double getCostEstimate(String resourceId) {
-            return 25.50; // Placeholder
+            // Basic cost estimation based on instance type
+            // In production, this should integrate with AWS Pricing API
+            try {
+                var specs = getCurrentSpecs(resourceId);
+                String instanceType = specs.get("instanceType");
+                if (instanceType != null) {
+                    // Simplified cost map - should be from AWS Pricing API
+                    return estimateCostByType(instanceType);
+                }
+            } catch (Exception e) {
+                log.warn("[TENANT:{}] Could not estimate cost for {}: {}", tenant.getId(), resourceId, e.getMessage());
+            }
+            return 0.0;
+        }
+        
+        private double estimateCostByType(String instanceType) {
+            // Approximate hourly costs for common instance types (us-east-1)
+            // TODO: Replace with AWS Pricing API integration
+            if (instanceType.startsWith("t3.")) {
+                if (instanceType.equals("t3.nano")) return 0.0052;
+                if (instanceType.equals("t3.micro")) return 0.0104;
+                if (instanceType.equals("t3.small")) return 0.0208;
+                if (instanceType.equals("t3.medium")) return 0.0416;
+                if (instanceType.equals("t3.large")) return 0.0832;
+                if (instanceType.equals("t3.xlarge")) return 0.1664;
+            }
+            return 0.05; // Default estimate
         }
         
         @Override
         public String getResourceType(String resourceId) {
-            return "t3.medium";
+            try {
+                var specs = getCurrentSpecs(resourceId);
+                return specs.getOrDefault("instanceType", "unknown");
+            } catch (Exception e) {
+                log.warn("[TENANT:{}] Could not get resource type for {}: {}", tenant.getId(), resourceId, e.getMessage());
+                return "unknown";
+            }
         }
         
         public void executeAction(CloudAction action) {
-            // Implementation for AWS-specific actions
             log.info("Executing AWS action for tenant {}: {}", tenant.getId(), action.getType());
+            // Implementation for AWS-specific actions
         }
         
         @Override
         public java.util.Map<String, String> getCurrentSpecs(String resourceId) {
-            return java.util.Map.of(
-                "provider", "aws",
-                "tenantId", tenant.getId(),
-                "resourceId", resourceId,
-                "status", "active"
-            );
+            try {
+                software.amazon.awssdk.services.ec2.model.DescribeInstancesRequest request = 
+                    software.amazon.awssdk.services.ec2.model.DescribeInstancesRequest.builder()
+                        .instanceIds(resourceId)
+                        .build();
+                software.amazon.awssdk.services.ec2.model.DescribeInstancesResponse response = 
+                    ec2Client.describeInstances(request);
+                
+                if (response.reservations().isEmpty() || response.reservations().get(0).instances().isEmpty()) {
+                    return java.util.Map.of();
+                }
+                
+                software.amazon.awssdk.services.ec2.model.Instance instance = 
+                    response.reservations().get(0).instances().get(0);
+                
+                return java.util.Map.of(
+                    "provider", "aws",
+                    "tenantId", tenant.getId(),
+                    "resourceId", resourceId,
+                    "instanceType", instance.instanceType().toString(),
+                    "state", instance.state().nameAsString(),
+                    "availabilityZone", instance.placement().availabilityZone()
+                );
+            } catch (Exception e) {
+                log.error("[TENANT:{}] Failed to get specs for {}: {}", tenant.getId(), resourceId, e.getMessage());
+                return java.util.Map.of(
+                    "provider", "aws",
+                    "tenantId", tenant.getId(),
+                    "resourceId", resourceId,
+                    "error", e.getMessage()
+                );
+            }
         }
         
         public String getProvider() {

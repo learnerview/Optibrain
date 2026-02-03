@@ -67,22 +67,70 @@ public class AwsCloudAdapter implements CloudAdapter {
 
     @Override
     public boolean scaleUp(String resourceId) {
-        if ("LOCALSTACK".equalsIgnoreCase(cloudConfig.getMode())) {
-            log.info("[LOCALSTACK] Scaling UP {} (simulated)", resourceId);
+        if (cloudConfig.isDryRun()) {
+            log.info("[DRY-RUN] Would scale UP {}", resourceId);
             return true;
         }
-        log.info("[REAL AWS] Scaling UP {}", resourceId);
-        return true;
+        
+        log.info("Scaling UP instance: {}", resourceId);
+        try (Ec2Client ec2 = getClient()) {
+            // For individual instances, we can start them if stopped
+            DescribeInstancesRequest descRequest = DescribeInstancesRequest.builder()
+                    .instanceIds(resourceId)
+                    .build();
+            DescribeInstancesResponse descResponse = ec2.describeInstances(descRequest);
+            
+            if (descResponse.reservations().isEmpty() || descResponse.reservations().get(0).instances().isEmpty()) {
+                log.warn("Instance {} not found", resourceId);
+                return false;
+            }
+            
+            Instance instance = descResponse.reservations().get(0).instances().get(0);
+            String state = instance.state().nameAsString();
+            
+            // If stopped, start it
+            if ("stopped".equalsIgnoreCase(state)) {
+                StartInstancesRequest startRequest = StartInstancesRequest.builder()
+                        .instanceIds(resourceId)
+                        .build();
+                ec2.startInstances(startRequest);
+                log.info("Started instance: {}", resourceId);
+                return true;
+            }
+            
+            // For scale up via instance type change, we would need to stop, modify, and start
+            // This is a more complex operation and should be done carefully
+            log.info("Instance {} is already running (state: {}). For instance type changes, use rightsize operation.", 
+                     resourceId, state);
+            return true;
+            
+        } catch (Exception e) {
+            log.error("Failed to scale up instance {}: {}", resourceId, e.getMessage());
+            return false;
+        }
     }
 
     @Override
     public boolean scaleDown(String resourceId) {
-        if ("LOCALSTACK".equalsIgnoreCase(cloudConfig.getMode())) {
-            log.info("[LOCALSTACK] Scaling DOWN {} (simulated)", resourceId);
+        if (cloudConfig.isDryRun()) {
+            log.info("[DRY-RUN] Would scale DOWN {}", resourceId);
             return true;
         }
-        log.info("[REAL AWS] Scaling DOWN {}", resourceId);
-        return true;
+        
+        log.info("Scaling DOWN instance: {}", resourceId);
+        try (Ec2Client ec2 = getClient()) {
+            // For scale down, we can stop the instance
+            StopInstancesRequest stopRequest = StopInstancesRequest.builder()
+                    .instanceIds(resourceId)
+                    .build();
+            ec2.stopInstances(stopRequest);
+            log.info("Stopped instance: {}", resourceId);
+            return true;
+            
+        } catch (Exception e) {
+            log.error("Failed to scale down instance {}: {}", resourceId, e.getMessage());
+            return false;
+        }
     }
 
     @Override
