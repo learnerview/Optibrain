@@ -128,6 +128,57 @@ async def health_check():
     """Health check endpoint"""
     return {"status": "healthy", "service": "optibrain-ml", "version": "1.0.0"}
 
+@app.get("/health/detailed")
+async def detailed_health_check():
+    """Detailed health check with component status"""
+    import sys
+    import psutil
+    
+    health = {
+        "status": "healthy",
+        "service": "OptiBrain ML Service",
+        "version": "1.0.0",
+        "timestamp": asyncio.get_event_loop().time(),
+        "components": {}
+    }
+    
+    # Check ML service initialization
+    if ml_service:
+        health["components"]["ml_service"] = {
+            "status": "UP",
+            "initialized": True
+        }
+    else:
+        health["components"]["ml_service"] = {
+            "status": "DOWN",
+            "initialized": False
+        }
+        health["status"] = "degraded"
+    
+    # System metrics
+    health["system"] = {
+        "python_version": sys.version,
+        "cpu_count": psutil.cpu_count(),
+        "cpu_percent": psutil.cpu_percent(interval=0.1),
+        "memory_total": psutil.virtual_memory().total,
+        "memory_available": psutil.virtual_memory().available,
+        "memory_percent": psutil.virtual_memory().percent
+    }
+    
+    return health
+
+@app.get("/health/ready")
+async def readiness_check():
+    """Kubernetes readiness probe"""
+    if ml_service and ml_service.is_ready:
+        return {"ready": True, "status": "READY"}
+    return {"ready": False, "status": "NOT_READY"}
+
+@app.get("/health/live")
+async def liveness_check():
+    """Kubernetes liveness probe"""
+    return {"alive": True, "status": "ALIVE", "timestamp": asyncio.get_event_loop().time()}
+
 @app.post("/predict/forecast", response_model=PredictionResponse)
 async def generate_forecast(request: ForecastRequest):
     """Generate time series forecast for tenant metrics"""
