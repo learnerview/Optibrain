@@ -31,7 +31,7 @@ public class LocalstackMetricsProvider implements MetricsProvider {
 
     public LocalstackMetricsProvider(
             @org.springframework.beans.factory.annotation.Value("${cloud.localstack.endpoint}") String endpoint,
-            @org.springframework.beans.annotation.Value("${cloud.localstack.region}") String region) {
+            @org.springframework.beans.factory.annotation.Value("${cloud.localstack.region}") String region) {
         this.endpoint = endpoint;
         this.region = region;
     }
