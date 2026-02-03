@@ -56,13 +56,13 @@ public class OptimizationServiceImpl implements OptimizationService {
         return recommendations;
     }
     
-    private Map<String, Object> createRecommendation(String id, String title, String description, String priority, double savings, String service) {
+    private Map<String, Object> createRecommendation(String id, String title, String description, String priority, double estimatedSavings, String service) {
         Map<String, Object> recommendation = new HashMap<>();
         recommendation.put("id", id);
         recommendation.put("title", title);
         recommendation.put("description", description);
         recommendation.put("priority", priority);
-        recommendation.put("estimatedSavings", savings);
+        recommendation.put("estimatedSavings", estimatedSavings);
         recommendation.put("service", service);
         recommendation.put("status", "PENDING");
         return recommendation;

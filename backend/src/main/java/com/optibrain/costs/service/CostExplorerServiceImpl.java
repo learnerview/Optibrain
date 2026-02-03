@@ -69,11 +69,11 @@ public class CostExplorerServiceImpl implements CostExplorerService {
         return services;
     }
     
-    private Map<String, Object> createServiceCost(String serviceName, double cost, double percentage) {
-        Map<String, Object> service = new HashMap<>();
-        service.put("service", serviceName);
-        service.put("cost", cost);
-        service.put("percentage", percentage);
-        return service;
+    private Map<String, Object> createServiceCost(String service, double cost, double percentage) {
+        Map<String, Object> serviceMap = new HashMap<>();
+        serviceMap.put("service", service);
+        serviceMap.put("cost", cost);
+        serviceMap.put("percentage", percentage);
+        return serviceMap;
     }
 }
