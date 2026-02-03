@@ -54,24 +54,13 @@ public class TenantAwareCloudAdapterFactory {
         }
         
         private software.amazon.awssdk.services.ec2.Ec2Client createEc2Client() {
-            var credentials = tenant.getCredentials();
-            if (credentials == null || credentials.getAccessKey() == null || credentials.getSecretKey() == null) {
-                throw new IllegalStateException("AWS credentials not configured for tenant: " + tenant.getId());
-            }
-            
-            software.amazon.awssdk.auth.credentials.AwsBasicCredentials awsCreds = 
-                software.amazon.awssdk.auth.credentials.AwsBasicCredentials.create(
-                    credentials.getAccessKey(), 
-                    credentials.getSecretKey()
-                );
-            
-            software.amazon.awssdk.regions.Region region = software.amazon.awssdk.regions.Region.of(
-                tenant.getRegion() != null ? tenant.getRegion() : "us-east-1"
-            );
+            // Use default credentials provider (will use env vars, IAM role, or AWS credentials file)
+            // In production, each tenant should have their own IAM role or credentials
+            software.amazon.awssdk.regions.Region region = software.amazon.awssdk.regions.Region.US_EAST_1;
             
             return software.amazon.awssdk.services.ec2.Ec2Client.builder()
                 .region(region)
-                .credentialsProvider(software.amazon.awssdk.auth.credentials.StaticCredentialsProvider.create(awsCreds))
+                .credentialsProvider(software.amazon.awssdk.auth.credentials.DefaultCredentialsProvider.create())
                 .build();
         }
         

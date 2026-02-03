@@ -79,18 +79,24 @@ public class AwsMetricsProvider implements MetricsProvider {
             Optional<Datapoint> latest = response.datapoints().stream()
                     .max(Comparator.comparing(Datapoint::timestamp));
             
-            return latest.map(Datapoint::average).orElse(65.0 + Math.random() * 15);
+            if (latest.isPresent()) {
+                return latest.get().average();
+            } else {
+                log.warn("No CPU metrics available from CloudWatch");
+                return 0.0; // Return 0 to indicate no data, not fake data
+            }
         } catch (Exception e) {
-            log.debug("CPU metrics not available, using estimate");
-            return 65.0 + Math.random() * 15;
+            log.error("Failed to fetch CPU metrics from CloudWatch: {}", e.getMessage());
+            return 0.0;
         }
     }
 
     private double getAverageMemoryUtilization() {
         try {
+            // Note: Memory metrics require CloudWatch agent to be installed on EC2 instances
             GetMetricStatisticsRequest request = GetMetricStatisticsRequest.builder()
-                    .namespace("System/Linux")
-                    .metricName("MemoryUtilization")
+                    .namespace("CWAgent")  // CloudWatch agent namespace
+                    .metricName("mem_used_percent")
                     .startTime(Instant.now().minusSeconds(3600))
                     .endTime(Instant.now())
                     .period(300)
@@ -101,71 +107,96 @@ public class AwsMetricsProvider implements MetricsProvider {
             Optional<Datapoint> latest = response.datapoints().stream()
                     .max(Comparator.comparing(Datapoint::timestamp));
             
-            return latest.map(Datapoint::average).orElse(55.0 + Math.random() * 20);
+            if (latest.isPresent()) {
+                return latest.get().average();
+            } else {
+                log.warn("No memory metrics available from CloudWatch. Ensure CloudWatch agent is installed.");
+                return 0.0; // Return 0 to indicate no data
+            }
         } catch (Exception e) {
-            log.debug("Memory metrics not available, using estimate");
-            return 55.0 + Math.random() * 20;
+            log.error("Failed to fetch memory metrics from CloudWatch: {}", e.getMessage());
+            return 0.0;
         }
     }
 
     private int getActiveInstanceCount() {
         try {
-            GetMetricStatisticsRequest request = GetMetricStatisticsRequest.builder()
-                    .namespace("AWS/EC2")
-                    .metricName("CPUUtilization")
-                    .startTime(Instant.now().minusSeconds(300))
-                    .endTime(Instant.now())
-                    .period(60)
-                    .statistics(Statistic.AVERAGE)
+            // Use EC2 API to get actual running instance count
+            software.amazon.awssdk.services.ec2.Ec2Client ec2 = software.amazon.awssdk.services.ec2.Ec2Client.builder()
+                    .region(Region.of(region))
+                    .credentialsProvider(DefaultCredentialsProvider.create())
                     .build();
-
-            GetMetricStatisticsResponse response = cloudWatchClient.getMetricStatistics(request);
-            return Math.max(1, response.datapoints().size());
+            
+            software.amazon.awssdk.services.ec2.model.DescribeInstancesRequest request = 
+                software.amazon.awssdk.services.ec2.model.DescribeInstancesRequest.builder()
+                    .filters(software.amazon.awssdk.services.ec2.model.Filter.builder()
+                        .name("instance-state-name")
+                        .values("running")
+                        .build())
+                    .build();
+            
+            software.amazon.awssdk.services.ec2.model.DescribeInstancesResponse response = ec2.describeInstances(request);
+            int count = (int) response.reservations().stream()
+                    .flatMap(r -> r.instances().stream())
+                    .count();
+            
+            ec2.close();
+            log.info("Active EC2 instances: {}", count);
+            return count;
         } catch (Exception e) {
-            return 2 + (int)(Math.random() * 3);
+            log.error("Failed to get active instance count: {}", e.getMessage());
+            return 0;
         }
     }
 
     private double getHourlyCost() {
         try {
+            // Get yesterday's date for completed data
+            Instant yesterday = Instant.now().minusSeconds(86400);
+            String startDate = yesterday.toString().substring(0, 10);
+            String endDate = Instant.now().toString().substring(0, 10);
+            
             GetCostAndUsageRequest request = GetCostAndUsageRequest.builder()
                     .timePeriod(DateInterval.builder()
-                            .start(Instant.now().minusSeconds(86400).toString())
-                            .end(Instant.now().toString())
+                            .start(startDate)
+                            .end(endDate)
                             .build())
                     .granularity(Granularity.DAILY)
-                    .metrics("BLENDED_COST")
-                    .groupBy(GroupDefinition.builder()
-                            .type(GroupDefinitionType.DIMENSION)
-                            .key("SERVICE")
-                            .build())
+                    .metrics("UnblendedCost")
                     .build();
 
             GetCostAndUsageResponse response = costExplorerClient.getCostAndUsage(request);
             double totalCost = response.resultsByTime().stream()
-                    .flatMap(result -> result.groups().stream())
-                    .mapToDouble(group -> {
-                        String amount = group.metrics().get(software.amazon.awssdk.services.costexplorer.model.Metric.BLENDED_COST).amount();
+                    .mapToDouble(result -> {
+                        String amount = result.total().get("UnblendedCost").amount();
                         return Double.parseDouble(amount);
                     })
                     .sum();
 
-            return totalCost / 24; // Convert daily to hourly
+            // Convert daily to hourly
+            double hourlyCost = totalCost / 24;
+            log.info("Hourly cost estimate: ${}", String.format("%.2f", hourlyCost));
+            return hourlyCost;
         } catch (Exception e) {
-            log.debug("Cost data not available, using estimate");
-            return 25.0 + Math.random() * 50;
+            log.error("Failed to fetch cost data from Cost Explorer: {}", e.getMessage());
+            return 0.0;
         }
     }
 
     private Map<String, Double> getServiceCostBreakdown() {
         try {
+            // Get yesterday's date for completed data
+            Instant yesterday = Instant.now().minusSeconds(86400);
+            String startDate = yesterday.toString().substring(0, 10);
+            String endDate = Instant.now().toString().substring(0, 10);
+            
             GetCostAndUsageRequest request = GetCostAndUsageRequest.builder()
                     .timePeriod(DateInterval.builder()
-                            .start(Instant.now().minusSeconds(86400).toString())
-                            .end(Instant.now().toString())
+                            .start(startDate)
+                            .end(endDate)
                             .build())
                     .granularity(Granularity.DAILY)
-                    .metrics("BLENDED_COST")
+                    .metrics("UnblendedCost")
                     .groupBy(GroupDefinition.builder()
                             .type(GroupDefinitionType.DIMENSION)
                             .key("SERVICE")
@@ -179,51 +210,60 @@ public class AwsMetricsProvider implements MetricsProvider {
                     .flatMap(result -> result.groups().stream())
                     .forEach(group -> {
                         String service = group.keys().get(0);
-                        double cost = Double.parseDouble(group.metrics().get(software.amazon.awssdk.services.costexplorer.model.Metric.BLENDED_COST).amount()) / 24;
+                        double cost = Double.parseDouble(
+                            group.metrics().get("UnblendedCost").amount()) / 24;
                         breakdown.put(service, cost);
                     });
-
-            // Ensure we have some key services
-            breakdown.putIfAbsent("EC2", 15.0 + Math.random() * 20);
-            breakdown.putIfAbsent("RDS", 8.0 + Math.random() * 10);
-            breakdown.putIfAbsent("S3", 2.0 + Math.random() * 5);
             
+            log.info("Service cost breakdown: {}", breakdown);
             return breakdown;
         } catch (Exception e) {
-            return Map.of(
-                    "EC2", 20.0 + Math.random() * 15,
-                    "RDS", 10.0 + Math.random() * 8,
-                    "S3", 3.0 + Math.random() * 4
-            );
+            log.error("Failed to fetch service cost breakdown: {}", e.getMessage());
+            return new HashMap<>(); // Return empty map instead of fake data
         }
     }
 
     private List<MetricSnapshot> getHistoricalData(int hours) {
         List<MetricSnapshot> history = new ArrayList<>();
-        for (int i = hours; i >= 1; i--) {
-            history.add(MetricSnapshot.builder()
-                    .timestamp(Instant.now().minusSeconds(i * 3600L))
-                    .cpu(60 + Math.random() * 20)
-                    .memory(50 + Math.random() * 25)
-                    .build());
+        try {
+            // Fetch actual historical CPU data from CloudWatch
+            GetMetricStatisticsRequest request = GetMetricStatisticsRequest.builder()
+                    .namespace("AWS/EC2")
+                    .metricName("CPUUtilization")
+                    .startTime(Instant.now().minusSeconds(hours * 3600L))
+                    .endTime(Instant.now())
+                    .period(3600) // 1 hour periods
+                    .statistics(Statistic.AVERAGE)
+                    .build();
+
+            GetMetricStatisticsResponse response = cloudWatchClient.getMetricStatistics(request);
+            
+            for (Datapoint datapoint : response.datapoints()) {
+                history.add(MetricSnapshot.builder()
+                        .timestamp(datapoint.timestamp())
+                        .cpu(datapoint.average())
+                        .memory(0.0) // Memory not available without CloudWatch agent
+                        .build());
+            }
+            
+            log.info("Fetched {} historical data points", history.size());
+        } catch (Exception e) {
+            log.error("Failed to fetch historical data: {}", e.getMessage());
         }
         return history;
     }
 
     private MetricData getFallbackMetrics() {
+        log.warn("Using fallback metrics - AWS data unavailable");
         return MetricData.builder()
-                .cpuUtilization(70.0 + Math.random() * 10)
-                .memoryUtilization(60.0 + Math.random() * 15)
-                .hourlyCost(30.0 + Math.random() * 40)
-                .instanceCount(3)
+                .cpuUtilization(0.0)
+                .memoryUtilization(0.0)
+                .hourlyCost(0.0)
+                .instanceCount(0)
                 .timestamp(Instant.now())
                 .region(region)
-                .serviceBreakdown(Map.of(
-                        "EC2", 25.0 + Math.random() * 15,
-                        "RDS", 12.0 + Math.random() * 8,
-                        "S3", 4.0 + Math.random() * 3
-                ))
-                .historicalData(getHistoricalData(24))
+                .serviceBreakdown(new HashMap<>())
+                .historicalData(new ArrayList<>())
                 .build();
     }
 
