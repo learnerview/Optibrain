@@ -23,6 +23,8 @@ import java.util.stream.Collectors;
 @Slf4j
 public class IdleResourceDetectionService {
 
+    private static final double METRICS_UNAVAILABLE = -1.0;
+    
     @Value("${aws.region:us-east-1}")
     private String region;
 
@@ -59,7 +61,7 @@ public class IdleResourceDetectionService {
                     // Get CPU utilization for the past N days
                     double avgCpu = getAverageCpuUtilization(cloudWatch, instanceId, idleDaysThreshold);
                     
-                    if (avgCpu < idleCpuThreshold && avgCpu >= 0) {
+                    if (avgCpu != METRICS_UNAVAILABLE && avgCpu < idleCpuThreshold) {
                         log.info("Found idle instance: {} with CPU: {}%", instanceId, avgCpu);
                         idleInstances.put(instanceId, IdleInstanceInfo.builder()
                                 .instanceId(instanceId)
@@ -151,19 +153,19 @@ public class IdleResourceDetectionService {
             
             if (response.datapoints().isEmpty()) {
                 log.warn("No CPU metrics available for instance: {}", instanceId);
-                return -1.0; // Indicate no data available
+                return METRICS_UNAVAILABLE;
             }
             
             double avgCpu = response.datapoints().stream()
                     .mapToDouble(Datapoint::average)
                     .average()
-                    .orElse(-1.0);
+                    .orElse(METRICS_UNAVAILABLE);
             
             return avgCpu;
             
         } catch (Exception e) {
             log.error("Failed to get CPU metrics for {}: {}", instanceId, e.getMessage());
-            return -1.0;
+            return METRICS_UNAVAILABLE;
         }
     }
 

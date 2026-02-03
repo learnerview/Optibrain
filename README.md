@@ -279,7 +279,7 @@ Logs are written to console by default. Configure log aggregation in production:
 4. **Rotate credentials** every 90 days
 5. **Enable CloudTrail** to audit all API calls
 6. **Test with read-only policy** before granting write access
-7. **Enable dry-run mode** (\`app.dry-run=true\`) in production initially
+7. **Enable dry-run mode** (\`cloud.dryRun=true\`) in production initially
 8. **Use separate AWS accounts** for dev, staging, and production
 
 ---
