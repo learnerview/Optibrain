@@ -1,5 +1,6 @@
 package com.optibrain.recommendation.service;
 
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
@@ -11,6 +12,7 @@ import java.util.Map;
  * Implementation of OptimizationService
  */
 @Service
+@ConditionalOnProperty(name = "app.demo-mode", havingValue = "true")
 public class OptimizationServiceImpl implements OptimizationService {
     
     @Override

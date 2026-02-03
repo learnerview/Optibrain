@@ -12,7 +12,7 @@ import java.util.List;
 import java.util.Map;
 
 @RestController
-@RequestMapping("/api/costs")
+@RequestMapping("/api/cost-explorer")
 @RequiredArgsConstructor
 @Slf4j
 public class CostExplorerController {
