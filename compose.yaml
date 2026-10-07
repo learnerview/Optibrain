@@ -1,0 +1,57 @@
+# LocalStack sandbox for OptiBrain.
+#
+# This is not a mock. It is a real AWS API implementation, so the backend reaches it with
+# the ordinary AWS SDK and ordinary request signatures. Only the endpoint and the
+# credentials differ from production, and both come from CloudProperties.
+#
+#   docker compose up -d localstack
+#   docker compose --profile seed run --rm seed
+#
+# Service list is limited to what the LocalStack community (free) licence covers.
+# Elastic Load Balancing v2 is not included: it would fail at runtime, so it is absent by
+# design. AwsCloudProviderAdapter guards each scanner, so a missing service yields an empty
+# section rather than a failed request.
+#
+# Cost Explorer is also absent. It has no LocalStack implementation, so cost queries return
+# an empty CostReport and the interface states that no spend data exists rather than
+# inventing figures.
+
+name: optibrain
+
+services:
+  localstack:
+    image: localstack/localstack:4
+    container_name: optibrain-localstack
+    ports:
+      - "4566:4566"
+    environment:
+      SERVICES: ec2,cloudwatch,autoscaling,rds,sts,s3,lambda,dynamodb,sqs
+      DEBUG: ${LOCALSTACK_DEBUG:-0}
+      PERSISTENCE: ${LOCALSTACK_PERSISTENCE:-0}
+    volumes:
+      - "${LOCALSTACK_DATA:-./.localstack}:/var/lib/localstack"
+      - "/var/run/docker.sock:/var/run/docker.sock"
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:4566/_localstack/health"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 10s
+
+  # One-shot seeding of a small, realistic account. Re-runnable: existing resources are
+  # reported as already present rather than duplicated. Not every step is protected
+  # (the idle-CPU datapoint and ELB steps may still fail on the community image).
+  seed:
+    image: amazon/aws-cli:latest
+    profiles: ["seed"]
+    container_name: optibrain-seed
+    depends_on:
+      localstack:
+        condition: service_healthy
+    environment:
+      AWS_ACCESS_KEY_ID: test
+      AWS_SECRET_ACCESS_KEY: test
+      AWS_DEFAULT_REGION: us-east-1
+    volumes:
+      - ./scripts/sandbox:/scripts:ro
+    entrypoint: ["sh", "/scripts/seed.sh"]
