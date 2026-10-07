@@ -145,9 +145,13 @@ Three guards apply inside `AwsCloudProviderAdapter#execute`, the only mutation s
   change against a running machine either fails or silently changes a working host.
 
 Execution also re-derives the plan from live state before mutating, refuses destructive
-actions whose target cannot be verified, replays repeated `idempotencyKey`s, and refuses a
-`planToken` that no longer matches (stale plan). Each execution writes a
-`RemediationOperation` and an `AuditLog` entry. See
+actions whose target cannot be verified, and refuses a `planToken` that no longer matches
+(stale plan). Idempotency is enforced by the database rather than by check-then-insert:
+before dispatch the `(tenantId, idempotencyKey)` pair is claimed as an `IN_PROGRESS` row,
+so two concurrent requests carrying the same key cannot both proceed - the losing claim
+insert hits the unique constraint and its request replays the winner's stored outcome.
+Each execution writes a `RemediationOperation` and an `AuditLog` entry, and a failure to
+persist either surfaces as an error rather than being logged and ignored. See
 [`operations/security.md`](operations/security.md) and
 [`api/endpoints.md`](api/endpoints.md).
 
@@ -187,6 +191,20 @@ reports `{ online: true, mode: "local-copilot-surface" }`.
 (`status: SIMULATED`, message "Demo Mode - Execution engine in development"). Rules do not
 run anything; the surface demonstrates the API shape.
 
+## Policies
+
+Optimization policies are persisted per tenant in a `policies` table instead of living in
+a shared in-memory map, so a tenant's configuration survives a restart and never crosses a
+tenant boundary. A tenant with no policies yet is seeded with three defaults (scaling,
+cost, security) on first read; `AutoscalingService` picks the highest-priority enabled
+policy for the current tenant. Every read and write is scoped to the tenant on the request:
+`getPolicy`, `getAllPolicies` and `deletePolicy` operate only on the current tenant's rows
+(or return empty when there is no tenant), and creates and updates stamp the owning tenant
+from the stored row, never from the caller. Outside a tenant context (startup, background,
+tooling) `getCurrentPolicy` falls back to the built-in default without persisting, and
+writes are refused - there is no "shared" policy set that a write could accidentally
+target. The `rules` map is stored as JSON in one column via `JsonStringMapConverter`.
+
 ## Tenants
 
 The full lifecycle is available through `/api/tenants`, with `@Version` optimistic locking
@@ -198,7 +216,10 @@ autonomous mode nor approval bypass is enabled at creation. The invariant
 `AUTONOMOUS ⇒ requireApprovalForChanges` is enforced on update.
 
 No endpoint accepts or returns AWS credentials. Per-tenant execution roles are resolved in
-AWS mode from `awsRoleArn`/`awsExternalId` via STS by `AwsClientFactory`.
+AWS mode from `awsRoleArn`/`awsExternalId` via STS by `AwsClientFactory`. A tenant with no
+role is refused (fail closed) rather than silently running on the application's own
+account; a deliberate single-account deployment can opt into the ambient chain once with
+`cloud.aws.allow-ambient-fallback=true`.
 
 ## Audit
 

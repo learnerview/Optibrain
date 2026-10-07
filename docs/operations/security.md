@@ -48,7 +48,14 @@ refusing to apply a change that cannot be verified"`), refuses `RESIZE_INSTANCE`
 instance the inventory does not confirm as `stopped` (`"An instance must be stopped before
 resizing..."`), and refuses a `planToken` that no longer matches live state (`"The plan is
 stale: ... Recompute the plan and retry."`).
-Repeated `idempotencyKey`s replay the stored outcome instead of mutating twice.
+
+Idempotency is enforced by the database: the `(tenantId, idempotencyKey)` pair is unique,
+and a request claims the key as an `IN_PROGRESS` row before dispatching. A duplicate of an
+already-finished key replays the stored outcome; a duplicate racing the winner hits the
+unique constraint on its claim insert and replays the winner's outcome, so no concurrent
+pair can both mutate. A failure to persist the operation or its audit entry is an error,
+never a logged-and-forgotten one: an action that cannot be recorded is not reported as
+success.
 
 ## Credentials
 
@@ -61,7 +68,10 @@ resolution:
   variables, then the shared credentials file. A missing credential fails at startup with
   a message naming the environment variables and pointing at `CLOUD_MODE=SANDBOX`.
 - In `AWS` mode, per-tenant roles are resolved via `sts:AssumeRole` from each tenant's
-  `awsRoleArn` / `awsExternalId`, cached per tenant key until expiry.
+  `awsRoleArn` / `awsExternalId`, cached per tenant key until expiry. A tenant with no
+  role is refused (fail closed) rather than silently running on the application's own
+  account; a single-account deployment can opt into the ambient chain explicitly with
+  `cloud.aws.allow-ambient-fallback=true`.
 
 `aws.access-key` and `aws.secret-key` are absent from every properties file - a credential
 in a properties file is a credential in version control.
@@ -118,7 +128,13 @@ Actuator exposes `health`, `info`, `metrics` in all profiles; dev additionally e
   refuses to start against an unexpected schema rather than mutating it.
 - Dev uses SQLite (`data/optibrain-dev.db`) with `create-drop`.
 - On SQLite, `DbUniqueIndexInitializer` recreates the declared unique indexes that the
-  dialect cannot add via `ALTER TABLE`.
+  dialect cannot add via `ALTER TABLE`, including the `(tenantId, idempotencyKey)`
+  uniqueness on `remediation_operations`.
+- New tables and indexes must be applied to a production PostgreSQL database before a
+  deploy, because `ddl-auto=validate` compares against (and never mutates) it. The
+  `policies` table must already exist or the application refuses to start, and the unique
+  `idx_rem_ops_tenant_idem` index should be created as well so idempotency is enforced by
+  the database in production too.
 
 ## Reporting a vulnerability
 

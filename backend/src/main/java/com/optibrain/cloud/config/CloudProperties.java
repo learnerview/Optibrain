@@ -71,6 +71,14 @@ public class CloudProperties {
          */
         private String costExplorerRegion = "us-east-1";
 
+        /**
+         * Whether a tenant without an IAM role may use the ambient credential chain when
+         * {@code cloud.mode=AWS}. Defaults to false so a misconfigured tenant can never
+         * silently act on the OptiBrain instance's own account. Set to true only for a
+         * single-account deployment where the application is the only identity involved.
+         */
+        private boolean allowAmbientFallback = false;
+
         public String getRegion() {
             return region;
         }
@@ -85,6 +93,14 @@ public class CloudProperties {
 
         public void setCostExplorerRegion(String costExplorerRegion) {
             this.costExplorerRegion = costExplorerRegion;
+        }
+
+        public boolean isAllowAmbientFallback() {
+            return allowAmbientFallback;
+        }
+
+        public void setAllowAmbientFallback(boolean allowAmbientFallback) {
+            this.allowAmbientFallback = allowAmbientFallback;
         }
     }
 

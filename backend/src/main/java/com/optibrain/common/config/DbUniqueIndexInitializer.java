@@ -16,9 +16,10 @@ import java.sql.Statement;
  * <p>{@code @Column(unique = true)} and {@code @Index(unique = true)} normally become
  * {@code ALTER TABLE ... ADD CONSTRAINT ... UNIQUE}, a statement SQLite does not support;
  * the {@code org.hibernate.community.dialect.SQLiteDialect} logs a warning and skips it.
- * The result in dev and sandbox runs is that {@code app_users.username} and
- * {@code orphaned_resources.resource_id} carry no uniqueness guarantee, which weakens the
- * identity store and the orphan-inventory deduplication.
+ * The result in dev and sandbox runs is that {@code app_users.username},
+ * {@code orphaned_resources.resource_id} and the idempotency key on
+ * {@code remediation_operations} carry no uniqueness guarantee, which weakens the
+ * identity store, the orphan-inventory deduplication and retry safety.
  *
  * <p>Running after Hibernate has created the tables, this recreates those unique indexes
  * explicitly when the database is SQLite. PostgreSQL (prod) is untouched: it is validated,
@@ -34,6 +35,8 @@ public class DbUniqueIndexInitializer implements ApplicationRunner {
                     + "idx_app_users_username ON app_users (username)"},
             {"uk_orphaned_resources_resource_id", "CREATE UNIQUE INDEX IF NOT EXISTS "
                     + "uk_orphaned_resources_resource_id ON orphaned_resources (resource_id)"},
+            {"idx_rem_ops_tenant_idem", "CREATE UNIQUE INDEX IF NOT EXISTS "
+                    + "idx_rem_ops_tenant_idem ON remediation_operations (tenant_id, idempotency_key)"},
     };
 
     private final DataSource dataSource;

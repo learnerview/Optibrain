@@ -55,10 +55,12 @@ import java.util.concurrent.ConcurrentHashMap;
  *
  * <p>Credentials are scoped to the tenant on the current thread. In AWS mode, a tenant
  * configured with an IAM role is served credentials obtained by AssumeRole with that
- * tenant's external id; a tenant with no role, and requests made outside a tenant
- * context, fall back to the ambient credential chain (IAM role, environment, profile).
- * Callers never touch a raw key: config stores a role to assume, not long-lived access
- * keys.
+ * tenant's external id; a tenant with no role is refused unless
+ * {@code cloud.aws.allow-ambient-fallback=true}, because letting a tenant silently use
+ * the ambient chain would break the isolation boundary this factory exists to enforce.
+ * Requests made outside a tenant context, and the STS client itself, use the ambient
+ * credential chain. Callers never touch a raw key: config stores a role to assume, not
+ * long-lived access keys.
  */
 @Component
 @Slf4j
@@ -176,8 +178,14 @@ public class AwsClientFactory {
 
     /**
      * The credentials for the tenant on the current thread: its assumed role if one is
-     * configured, otherwise the ambient chain, and always the sandbox pair in SANDBOX
-     * mode.
+     * configured, and in SANDBOX mode the sandbox pair.
+     *
+     * <p>In AWS mode a tenant that is missing or has no role is a hard failure unless
+     * {@code cloud.aws.allow-ambient-fallback} is explicitly enabled: a tenant that
+     * silently used the OptiBrain instance's own account would be the exact
+     * cross-account isolation leak this factory exists to stop. Requests made outside
+     * any tenant context still use the ambient chain; there is no tenant yet to scope
+     * them.
      */
     private AwsCredentialsProvider tenantedProvider() {
         if (cloudProperties.getMode() == CloudMode.SANDBOX) {
@@ -187,12 +195,30 @@ public class AwsClientFactory {
         if (tenantId == null || tenantId.isBlank()) {
             return ambientProvider;
         }
-        Tenant tenant = tenants == null ? null
-                : tenants.findTenant(tenantId).orElse(null);
-        if (tenant == null || tenant.getAwsRoleArn() == null || tenant.getAwsRoleArn().isBlank()) {
-            return ambientProvider;
+        Tenant tenant = tenants == null ? null : tenants.findTenant(tenantId).orElse(null);
+        if (tenant == null) {
+            return tenantless(tenantId,
+                    "no tenant with id '" + tenantId + "' is configured with AWS credentials");
+        }
+        if (tenant.getAwsRoleArn() == null || tenant.getAwsRoleArn().isBlank()) {
+            return tenantless(tenantId, "tenant '" + tenantId + "' has no awsRoleArn configured");
         }
         return cachedRole(tenant);
+    }
+
+    /**
+     * Resolves a tenantless credential request: the ambient chain when the operator
+     * opted in, otherwise a failure loud enough that the missing role cannot be missed.
+     */
+    private AwsCredentialsProvider tenantless(String tenantId, String reason) {
+        if (cloudProperties.getAws().isAllowAmbientFallback()) {
+            return ambientProvider;
+        }
+        throw new IllegalStateException(
+                "cloud.mode=AWS but " + reason + ". Refusing to fall back to the ambient "
+                        + "account, which would break tenant isolation. Set the tenant's "
+                        + "awsRoleArn, or opt into a single-account deployment with "
+                        + "cloud.aws.allow-ambient-fallback=true.");
     }
 
     private AwsCredentialsProvider cachedRole(Tenant tenant) {

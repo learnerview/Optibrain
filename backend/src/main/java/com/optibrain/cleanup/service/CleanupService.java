@@ -90,8 +90,7 @@ public class CleanupService {
             if (ageInDays(volume.createdAt()) < daysThreshold) {
                 continue;
             }
-            result.add(toEntity(tenantId, volume, "EBS_VOLUME",
-                    volume.monthlyCost() == null ? 0.0 : volume.monthlyCost()));
+            result.add(toEntity(tenantId, volume, "EBS_VOLUME", volume.monthlyCost()));
         }
         return result;
     }
@@ -102,8 +101,7 @@ public class CleanupService {
             if ("true".equalsIgnoreCase(ip.spec("associated"))) {
                 continue;
             }
-            result.add(toEntity(tenantId, ip, "ELASTIC_IP",
-                    ip.monthlyCost() == null ? 0.0 : ip.monthlyCost()));
+            result.add(toEntity(tenantId, ip, "ELASTIC_IP", ip.monthlyCost()));
         }
         return result;
     }
@@ -114,8 +112,7 @@ public class CleanupService {
             if (ageInDays(snapshot.createdAt()) < daysThreshold) {
                 continue;
             }
-            result.add(toEntity(tenantId, snapshot, "SNAPSHOT",
-                    snapshot.monthlyCost() == null ? 0.0 : snapshot.monthlyCost()));
+            result.add(toEntity(tenantId, snapshot, "SNAPSHOT", snapshot.monthlyCost()));
         }
         return result;
     }
@@ -142,8 +139,7 @@ public class CleanupService {
             }
             double totalRequests = series.points().stream().mapToDouble(p -> p.average()).sum();
             if (totalRequests <= 0.0) {
-                result.add(toEntity(tenantId, lb, "LOAD_BALANCER",
-                        lb.monthlyCost() == null ? 0.0 : lb.monthlyCost()));
+                result.add(toEntity(tenantId, lb, "LOAD_BALANCER", lb.monthlyCost()));
             }
         }
         return result;
@@ -192,7 +188,7 @@ public class CleanupService {
     }
 
     private OrphanedResource toEntity(String tenantId, CloudResource resource,
-                                      String legacyTypeName, double monthlyCost) {
+                                      String legacyTypeName, Double monthlyCost) {
         OrphanedResource entity = OrphanedResource.builder()
                 .resourceId(resource.id())
                 .resourceType(legacyTypeName)

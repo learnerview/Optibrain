@@ -16,6 +16,7 @@ import com.optibrain.cloud.remediation.repository.RemediationOperationRepository
 import com.optibrain.common.context.TenantContext;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 
 import java.nio.charset.StandardCharsets;
@@ -173,80 +174,151 @@ public class RemediationService {
             ActionResult result = ActionResult.rejected(request,
                     "The plan is stale: the resource state no longer matches it. "
                             + "Recompute the plan and retry.");
-            record(request, result);
+            record(request, result, null);
             return result;
         }
         if (plan.blocked()) {
             ActionResult result = ActionResult.rejected(request, plan.blockedReason());
-            record(request, result);
+            record(request, result, null);
             return result;
         }
         if (!dryRun && plan.dryRunOnly()) {
             ActionResult result = ActionResult.rejected(request,
                     "The global dry-run interlock is enabled; no change can be applied");
-            record(request, result);
+            record(request, result, null);
             return result;
         }
 
-        ActionResult result = cloudProvider.execute(request);
-        record(request, result);
+        // Claim the idempotency key before dispatch. The unique (tenantId, key)
+        // constraint is what arbitrates concurrency: the request whose claim insert wins
+        // runs, and every concurrent duplicate hits the violation and replays that
+        // outcome. Reserving before dispatch also means a persistence failure here
+        // surfaces before any mutation happens, not after.
+        IdempotencyClaim claim = claimIdempotency(tenantId, request);
+        if (claim.contended()) {
+            RemediationOperation latest = replayIfKnown(tenantId, idempotencyKey);
+            if (latest != null) {
+                log.info("Idempotency key {} was already reserved; replaying its outcome",
+                        idempotencyKey);
+                return replay(latest, type, resourceId, safeParameters);
+            }
+            return ActionResult.rejected(request,
+                    "Another request is already executing idempotency key " + idempotencyKey
+                            + "; its outcome is not stored yet");
+        }
+
+        ActionResult result;
+        try {
+            result = cloudProvider.execute(request);
+        } catch (RuntimeException e) {
+            // The provider normally converts failures into a FAILED result; an exception
+            // escaping is still a failed action and must be recorded as one.
+            log.warn("Dispatch failed for {} on {}: {}", type, resourceId, e.getMessage());
+            result = ActionResult.failed(request, e);
+        }
+
+        record(request, result, claim.row());
         return result;
     }
 
-    private void record(ResourceAction request, ActionResult result) {
+    private void record(ResourceAction request, ActionResult result, RemediationOperation claim) {
         audit.add(new ExecutionRecord(request.type(), request.resourceId(), result.applied(),
                 result.dryRun(), result.success(), result.message(), Instant.now()));
         while (audit.size() > AUDIT_CAPACITY) {
             audit.remove(0);
         }
-        persist(request, result);
+        // A failure to persist either the operation or its audit row must surface. An
+        // action that cannot be recorded cannot honestly be reported as success; the old
+        // catch-and-continue is exactly what made persistence failures invisible.
+        persistOutcome(request, result, claim);
         persistAudit(request, result);
     }
 
-    /** Persists the operation itself so retries and dashboards can refer to it. */
-    private void persist(ResourceAction request, ActionResult result) {
-        if (operations == null) {
+    /**
+     * Reserves an idempotency key as an {@code IN_PROGRESS} operation row.
+     *
+     * <p>Returns the claimed row when this request won the claim, or a contended marker
+     * when the unique {@code (tenantId, idempotencyKey)} constraint refused the insert -
+     * meaning a concurrent request already holds the key and will write the durable
+     * outcome. A request without a key skips the claim entirely.
+     */
+    private IdempotencyClaim claimIdempotency(String tenantId, ResourceAction request) {
+        String key = request.idempotencyKey();
+        if (key == null || key.isBlank() || tenantId == null || tenantId.isBlank()) {
+            return new IdempotencyClaim(null, false);
+        }
+        RemediationOperation claim = RemediationOperation.builder()
+                .idempotencyKey(key)
+                .action(request.type().name())
+                .resourceId(request.resourceId())
+                .dryRun(request.dryRun())
+                .status(RemediationStatus.IN_PROGRESS)
+                .message("Execution started")
+                .build();
+        claim.setTenantId(tenantId);
+        try {
+            operations.saveAndFlush(claim);
+            log.info("Reserved idempotency key {} for {} on {}", key, request.type(),
+                    request.resourceId());
+            return new IdempotencyClaim(claim, false);
+        } catch (DataIntegrityViolationException e) {
+            log.info("Idempotency key {} already reserved; a concurrent request holds it", key);
+            return new IdempotencyClaim(claim, true);
+        }
+    }
+
+    private record IdempotencyClaim(RemediationOperation row, boolean contended) {
+    }
+
+    /**
+     * Persists the settled outcome onto the claimed row, or a new row when no key was
+     * claimed. Throws on failure so a broken database can never masquerade as a
+     * successful remediation.
+     */
+    private void persistOutcome(ResourceAction request, ActionResult result,
+                                RemediationOperation claim) {
+        RemediationStatus status = statusOf(result);
+        String message = result.message() != null ? result.message() : result.error();
+        Double savings = result.estimatedMonthlySavings();
+        if (claim != null) {
+            claim.setStatus(status);
+            claim.setMessage(message);
+            claim.setSavings(savings);
+            claim.setDryRun(request.dryRun());
+            operations.save(claim);
             return;
         }
-        try {
-            RemediationOperation operation = RemediationOperation.builder()
-                    .idempotencyKey(request.idempotencyKey())
-                    .action(request.type().name())
-                    .resourceId(request.resourceId())
-                    .dryRun(request.dryRun())
-                    .status(statusOf(result))
-                    .message(result.message() != null ? result.message() : result.error())
-                    .savings(result.estimatedMonthlySavings())
-                    .build();
-            operation.setTenantId(TenantContext.getTenantId());
-            operations.save(operation);
-        } catch (Exception e) {
-            log.warn("Could not persist remediation operation: {}", e.getMessage());
-        }
+        RemediationOperation operation = RemediationOperation.builder()
+                .idempotencyKey(request.idempotencyKey())
+                .action(request.type().name())
+                .resourceId(request.resourceId())
+                .dryRun(request.dryRun())
+                .status(status)
+                .message(message)
+                .savings(savings)
+                .build();
+        operation.setTenantId(TenantContext.getTenantId());
+        operations.save(operation);
     }
 
     private void persistAudit(ResourceAction request, ActionResult result) {
         if (auditService == null) {
             return;
         }
-        try {
-            AuditLog entry = new AuditLog();
-            entry.setDecisionId("rem-" + java.util.UUID.randomUUID().toString().substring(0, 8));
-            entry.setMode("REMEDIATION");
-            entry.setRegion(cloudProvider.region());
-            entry.setReason("remediation via " + request.reason());
-            entry.setProviderSource("remediation");
-            entry.setAction(request.type().name());
-            entry.setResourceId(request.resourceId());
-            entry.setStatus(result.success() ? AuditStatus.SUCCESS : AuditStatus.FAILED);
-            entry.setExplanation(truncate(result.message() != null ? result.message() : result.error(), 1000));
-            entry.setSavings(result.estimatedMonthlySavings() == null ? 0.0
-                    : result.estimatedMonthlySavings());
-            entry.setScore(0.0);
-            auditService.record(entry);
-        } catch (Exception e) {
-            log.warn("Could not record remediation audit entry: {}", e.getMessage());
-        }
+        AuditLog entry = new AuditLog();
+        entry.setDecisionId("rem-" + java.util.UUID.randomUUID().toString().substring(0, 8));
+        entry.setMode("REMEDIATION");
+        entry.setRegion(cloudProvider.region());
+        entry.setReason("remediation via " + request.reason());
+        entry.setProviderSource("remediation");
+        entry.setAction(request.type().name());
+        entry.setResourceId(request.resourceId());
+        entry.setStatus(result.success() ? AuditStatus.SUCCESS : AuditStatus.FAILED);
+        entry.setExplanation(truncate(result.message() != null ? result.message() : result.error(), 1000));
+        entry.setSavings(result.estimatedMonthlySavings() == null ? 0.0
+                : result.estimatedMonthlySavings());
+        entry.setScore(0.0);
+        auditService.record(entry);
     }
 
     /** Returns a stored operation for the tenant and key, or null when it is new. */
@@ -269,6 +341,9 @@ public class RemediationService {
         return switch (existing.getStatus()) {
             case SUCCESS -> ActionResult.succeeded(request, message, existing.getSavings());
             case SIMULATED -> ActionResult.simulated(request, message, existing.getSavings());
+            case IN_PROGRESS -> new ActionResult(false, false, existing.isDryRun(), type, resourceId,
+                    "A previous execution with this idempotency key did not complete",
+                    null, "Execution did not complete", Instant.now());
             case FAILED -> new ActionResult(false, false, existing.isDryRun(), type, resourceId,
                     message, existing.getSavings(),
                     existing.getMessage() == null ? "Action failed" : existing.getMessage(),
@@ -324,7 +399,10 @@ public class RemediationService {
             }
             return hex.substring(0, 16);
         } catch (NoSuchAlgorithmException e) {
-            return Integer.toHexString(input.hashCode());
+            // SHA-256 is mandated by the Java platform, so this is unreachable in practice.
+            // Degrading to String.hashCode() would let distinct plans collide and replay a
+            // stale plan, so the process must stop rather than sign badly.
+            throw new IllegalStateException("SHA-256 is unavailable, cannot sign plan tokens", e);
         }
     }
 

@@ -21,10 +21,16 @@ import lombok.experimental.SuperBuilder;
  * request, which is what makes retries safe: the {@code idempotencyKey} column is a
  * client-supplied correlation id scoped to the tenant, and replaying a request with the
  * same key returns the stored outcome instead of executing the mutation twice.
+ *
+ * <p>The {@code (tenantId, idempotencyKey)} pair is <strong>unique</strong>. Uniqueness
+ * is enforced by the database, not by a check-then-insert in the service, so two
+ * concurrent requests carrying the same key cannot both pass the check: the loser's
+ * claim insert fails on the constraint and it replays the winner's stored outcome. See
+ * {@code RemediationService} for the claim-before-dispatch flow.
  */
 @Entity
 @Table(name = "remediation_operations", indexes = {
-        @Index(name = "idx_rem_ops_tenant_idem", columnList = "tenantId, idempotencyKey")
+        @Index(name = "idx_rem_ops_tenant_idem", columnList = "tenantId, idempotencyKey", unique = true)
 })
 @Getter
 @Setter

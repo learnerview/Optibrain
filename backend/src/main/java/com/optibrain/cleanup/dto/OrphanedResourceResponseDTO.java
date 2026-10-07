@@ -6,7 +6,7 @@ public record OrphanedResourceResponseDTO(
     String resourceId,
     String resourceType,
     String region,
-    double estimatedMonthlyCost,
+    Double estimatedMonthlyCost,
     boolean resolved,
     Instant createdAt
 ) {}

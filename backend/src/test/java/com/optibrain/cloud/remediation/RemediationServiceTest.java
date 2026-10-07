@@ -8,10 +8,15 @@ import com.optibrain.cloud.model.CloudResource;
 import com.optibrain.cloud.model.ResourceAction;
 import com.optibrain.cloud.model.ResourceType;
 import com.optibrain.cloud.port.CloudProviderPort;
+import com.optibrain.cloud.remediation.model.RemediationOperation;
+import com.optibrain.cloud.remediation.model.RemediationStatus;
 import com.optibrain.cloud.remediation.repository.RemediationOperationRepository;
+import com.optibrain.common.context.TenantContext;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
+import org.springframework.dao.DataIntegrityViolationException;
 
 import java.util.Map;
 import java.util.Optional;
@@ -34,11 +39,18 @@ import static org.mockito.Mockito.when;
  */
 class RemediationServiceTest {
 
+    private static final String TENANT = "t1";
+
     private final CloudProviderPort provider = mock(CloudProviderPort.class);
     private final CloudProperties properties = new CloudProperties();
     private final AuditService auditService = mock(AuditService.class);
     private final RemediationOperationRepository operations =
             mock(RemediationOperationRepository.class);
+
+    @AfterEach
+    void clearTenant() {
+        TenantContext.clear();
+    }
 
     private RemediationService service(boolean dryRun) {
         properties.setDryRun(dryRun);
@@ -237,5 +249,81 @@ class RemediationServiceTest {
         ArgumentCaptor<ResourceAction> action = ArgumentCaptor.forClass(ResourceAction.class);
         verify(provider).execute(action.capture());
         assertThat(action.getValue().parameters()).isEmpty();
+    }
+
+    private RemediationOperation stored(RemediationStatus status, String message, Double savings) {
+        return RemediationOperation.builder()
+                .idempotencyKey("k1")
+                .action("STOP_INSTANCE")
+                .resourceId("i-1")
+                .dryRun(true)
+                .status(status)
+                .message(message)
+                .savings(savings)
+                .build();
+    }
+
+    @Test
+    @DisplayName("a known idempotency key replays the stored outcome without re-dispatching")
+    void replaysStoredOutcomeForAKnownKey() {
+        TenantContext.setTenantId(TENANT);
+        when(operations.findByTenantIdAndIdempotencyKey(TENANT, "k1"))
+                .thenReturn(Optional.of(stored(RemediationStatus.SUCCESS, "already stopped", 12.0)));
+
+        ActionResult result = service().execute(ActionType.STOP_INSTANCE, "i-1",
+                Map.of(), true, "k1", null);
+
+        assertThat(result.success()).isTrue();
+        assertThat(result.message()).isEqualTo("already stopped");
+        assertThat(result.estimatedMonthlySavings()).isEqualTo(12.0);
+        verify(provider, never()).execute(any());
+    }
+
+    @Test
+    @DisplayName("a claimed key contested by a concurrent request replays the winner's outcome")
+    void aContestedClaimReplaysTheConcurrentWinner() {
+        TenantContext.setTenantId(TENANT);
+        when(operations.findByTenantIdAndIdempotencyKey(TENANT, "k1"))
+                .thenReturn(Optional.empty(),
+                        Optional.of(stored(RemediationStatus.SUCCESS, "winner stored", 9.0)));
+        when(operations.saveAndFlush(any()))
+                .thenThrow(new DataIntegrityViolationException("duplicate key"));
+
+        ActionResult result = service().execute(ActionType.STOP_INSTANCE, "i-1",
+                Map.of(), true, "k1", null);
+
+        assertThat(result.success()).isTrue();
+        assertThat(result.message()).isEqualTo("winner stored");
+        // The loser must never dispatch its own mutation.
+        verify(provider, never()).execute(any());
+    }
+
+    @Test
+    @DisplayName("an in-progress row is reported as incomplete, not as success")
+    void anInProgressRowIsReportedAsIncomplete() {
+        TenantContext.setTenantId(TENANT);
+        when(operations.findByTenantIdAndIdempotencyKey(TENANT, "k1"))
+                .thenReturn(Optional.of(stored(RemediationStatus.IN_PROGRESS, "Execution started", null)));
+
+        ActionResult result = service().execute(ActionType.STOP_INSTANCE, "i-1",
+                Map.of(), true, "k1", null);
+
+        assertThat(result.success()).isFalse();
+        assertThat(result.message()).contains("did not complete");
+        verify(provider, never()).execute(any());
+    }
+
+    @Test
+    @DisplayName("a key-less execution claims nothing and still records its outcome")
+    void keylessExecutionClaimsNothing() {
+        TenantContext.setTenantId(TENANT);
+        when(provider.execute(any())).thenReturn(ActionResult.rejected(
+                ResourceAction.of(ActionType.STOP_INSTANCE, "i-1", true, "test"), "dry-run"));
+
+        service().execute(ActionType.STOP_INSTANCE, "i-1", Map.of(), true);
+
+        verify(operations, never()).saveAndFlush(any());
+        verify(operations).save(any());
+        verify(auditService).record(any());
     }
 }

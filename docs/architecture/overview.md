@@ -105,7 +105,9 @@ AWS API, so round trips are minimised).
 
 Entities extend `BaseEntity` (UUID id, `tenantId`, `createdAt`, `updatedAt`). `Tenant`
 stands alone because it owns tenancy rather than belonging to one, and carries `@Version`
-for optimistic locking.
+for optimistic locking. `Policy` is tenant-scoped and stores its `rules` map as JSON in one
+column (`JsonStringMapConverter`); `PolicyService` seeds each tenant's default set on first
+read and scopes every read and write to the tenant on the request.
 
 - Dev/default: SQLite (`data/optibrain-dev.db`), `ddl-auto=create-drop`.
 - Product default (`application.properties`): SQLite, `ddl-auto=update`.
@@ -115,14 +117,16 @@ for optimistic locking.
 SQLite does not honour `ALTER TABLE ... ADD CONSTRAINT ... UNIQUE`, so
 `DbUniqueIndexInitializer` recreates the declared unique indexes
 (`idx_app_users_username` on `app_users(username)`,
-`uk_orphaned_resources_resource_id` on `orphaned_resources(resource_id)`) when the
-database product is SQLite.
+`uk_orphaned_resources_resource_id` on `orphaned_resources(resource_id)`,
+`idx_rem_ops_tenant_idem` on `remediation_operations(tenant_id, idempotency_key)`) when
+the database product is SQLite. The idempotency index is what makes retries safe under
+concurrency: two simultaneous requests with the same key cannot both claim it.
 
 ## Configuration
 
 `CloudProperties` binds `cloud.*` (mode, dry-run, aws.region, aws.cost-explorer-region,
-sandbox.endpoint). Binding is type-checked at startup, so an invalid `cloud.mode` fails
-immediately rather than defaulting silently. Annotations in
+aws.allow-ambient-fallback, sandbox.endpoint). Binding is type-checked at startup, so an
+invalid `cloud.mode` fails immediately rather than defaulting silently. Annotations in
 `backend/src/main/resources/*.properties` document every environment variable
 (`CLOUD_MODE`, `CLOUD_DRY_RUN`, `SANDBOX_ENDPOINT`, `AWS_REGION`, `JWT_SECRET`,
 `DB_URL`, `DB_USERNAME`, `DB_PASSWORD`, `SERVER_PORT`, `ALLOWED_ORIGINS`, ...).
@@ -143,4 +147,7 @@ discovered, and multi-region support would be a new feature, not a flag.
 legacy `X-TENANT` / `X-USER` headers are tolerated only when they exactly match the
 principal; a mismatch is rejected with 403. The context is cleared in a `finally` block.
 In AWS mode, `AwsClientFactory` returns per-tenant clients authenticated via
-`AssumeRole` with each tenant's `awsRoleArn` / `awsExternalId`.
+`AssumeRole` with each tenant's `awsRoleArn` / `awsExternalId`; a tenant with no role is
+refused (fail closed) rather than silently using the application's ambient account, unless
+`cloud.aws.allow-ambient-fallback=true` explicitly opts a single-account deployment into
+that.

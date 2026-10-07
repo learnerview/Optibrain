@@ -105,9 +105,11 @@ public class Tenant {
     private String requiredTagKeysCsv;
 
     /**
-     * IAM role to assume for this tenant's AWS operations. Null means the tenant runs
-     * against the ambient credential chain. An assumed-role setting applies only in
-     * {@code cloud.mode=AWS}; the sandbox ignores it.
+     * IAM role to assume for this tenant's AWS operations. In {@code cloud.mode=AWS},
+     * a tenant with no role is refused (fail closed) rather than silently using the
+     * OptiBrain instance's ambient credentials, unless
+     * {@code cloud.aws.allow-ambient-fallback=true} opts an operator into that for a
+     * single-account deployment. The sandbox ignores this entirely.
      */
     @Column(length = 2048)
     private String awsRoleArn;

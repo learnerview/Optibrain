@@ -165,6 +165,13 @@ Each tenant role then carries the read/remediation statements above for its own 
 and its trust policy permits the application role with `sts:ExternalId` (matching the
 tenant's `awsExternalId`).
 
+A tenant without an `awsRoleArn` is refused in `AWS` mode (fail closed) rather than
+silently acting on the application's own account - that refusal is the isolation boundary
+this section documents. A deliberate single-account deployment, where every tenant acts on
+the same account the application runs in, can relax it once from outside the per-tenant
+configuration with `cloud.aws.allow-ambient-fallback=true`; every tenant then resolves to
+the ambient chain.
+
 ## Principal
 
 For a single workload identity:

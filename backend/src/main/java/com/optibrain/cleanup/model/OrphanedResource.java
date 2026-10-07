@@ -21,7 +21,14 @@ public class OrphanedResource extends BaseEntity {
     private String resourceType;
 
     private String region;
-    private double estimatedMonthlyCost;
+
+    /**
+     * Estimated monthly cost, or {@code null} when the source does not attribute one.
+     * Null is preserved rather than coerced to 0.0: an unknown cost is genuinely unknown,
+     * and a 0.0 reads as "free", which would bias decisions toward reclaiming a resource
+     * whose true cost is simply not known.
+     */
+    private Double estimatedMonthlyCost;
 
     @Builder.Default
     @Column(nullable = false)
