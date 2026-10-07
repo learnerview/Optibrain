@@ -19,6 +19,7 @@ public class TenantUpdateRequest {
     private Boolean requireApprovalForChanges;
     private Double monthlyBudgetLimit;
     private List<String> protectedResources;
+    private List<String> requiredTagKeys;
     private String awsRoleArn;
     private String awsExternalId;
 
@@ -76,6 +77,14 @@ public class TenantUpdateRequest {
 
     public void setProtectedResources(List<String> protectedResources) {
         this.protectedResources = protectedResources;
+    }
+
+    public List<String> getRequiredTagKeys() {
+        return requiredTagKeys;
+    }
+
+    public void setRequiredTagKeys(List<String> requiredTagKeys) {
+        this.requiredTagKeys = requiredTagKeys;
     }
 
     public String getAwsRoleArn() {

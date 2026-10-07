@@ -3,6 +3,9 @@ package com.optibrain.cloud.governance;
 import com.optibrain.cloud.model.CloudResource;
 import com.optibrain.cloud.port.CloudProviderPort;
 import com.optibrain.cloud.port.ResourceQuery;
+import com.optibrain.common.context.TenantContext;
+import com.optibrain.tenant.model.Tenant;
+import com.optibrain.tenant.repository.TenantRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -38,21 +41,21 @@ import java.util.Set;
 public class TagGovernanceService {
 
     /**
-     * Tag keys considered required.
-     *
-     * <p>AWS convention. Configurable per deployment in a fuller implementation; fixed
-     * here because the product has no per-tenant policy store yet.
+     * Platform default tag keys when a tenant defines none.
      */
-    static final List<String> REQUIRED_KEYS = List.of("Environment", "Owner");
+    static final List<String> DEFAULT_KEYS = List.of("Environment", "Owner");
 
     private final CloudProviderPort cloudProvider;
+    private final TenantRepository tenants;
 
     /**
-     * @param requiredKeys tag keys a resource must carry; defaults to {@link #REQUIRED_KEYS}
+     * @param requiredKeys tag keys a resource must carry; when absent or empty, the
+     *                     current tenant's configured keys are used, falling back to
+     *                     {@link #DEFAULT_KEYS} when the tenant has none.
      */
     public TagCoverageReport report(List<String> requiredKeys) {
         List<String> required = requiredKeys == null || requiredKeys.isEmpty()
-                ? REQUIRED_KEYS : requiredKeys;
+                ? effectiveTenantKeys() : requiredKeys;
 
         List<CloudResource> resources = cloudProvider.discover(ResourceQuery.all());
 
@@ -155,6 +158,23 @@ public class TagGovernanceService {
                         Comparator.reverseOrder()))
                 .limit(50)
                 .toList();
+    }
+
+    /**
+     * The tenant-configured required keys, or the platform defaults.
+     *
+     * <p>Without a tenant context (tests, bootstrap) the platform defaults apply. A
+     * tenant that has never configured keys also gets the defaults, so a fresh account
+     * reports the sane baseline until an operator asserts a per-tenant policy.
+     */
+    private List<String> effectiveTenantKeys() {
+        String tenantId = TenantContext.getTenantId();
+        if (tenantId == null || tenantId.isBlank()) {
+            return DEFAULT_KEYS;
+        }
+        Tenant tenant = tenants.findById(tenantId).orElse(null);
+        List<String> keys = tenant == null ? null : tenant.getRequiredTagKeys();
+        return keys == null || keys.isEmpty() ? DEFAULT_KEYS : keys;
     }
 
     private Set<String> missingKeys(CloudResource resource, List<String> required) {

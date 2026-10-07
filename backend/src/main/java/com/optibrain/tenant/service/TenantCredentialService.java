@@ -130,6 +130,9 @@ public class TenantCredentialService {
         if (changes.getProtectedResources() != null) {
             existing.setProtectedResources(changes.getProtectedResources());
         }
+        if (changes.getRequiredTagKeys() != null) {
+            existing.setRequiredTagKeys(changes.getRequiredTagKeys());
+        }
         if (changes.getAwsRoleArn() != null) {
             existing.setAwsRoleArn(changes.getAwsRoleArn().isBlank() ? null : changes.getAwsRoleArn().trim());
         }

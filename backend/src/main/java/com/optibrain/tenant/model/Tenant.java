@@ -97,6 +97,14 @@ public class Tenant {
     private String protectedResourcesCsv;
 
     /**
+     * Tag keys every resource in this tenant must carry. Stored as a comma-separated
+     * list because it is small and never queried by element. Null or blank means the
+     * platform defaults ({@code Environment}, {@code Owner}).
+     */
+    @Column(length = 2000)
+    private String requiredTagKeysCsv;
+
+    /**
      * IAM role to assume for this tenant's AWS operations. Null means the tenant runs
      * against the ambient credential chain. An assumed-role setting applies only in
      * {@code cloud.mode=AWS}; the sandbox ignores it.
@@ -138,5 +146,21 @@ public class Tenant {
         this.protectedResourcesCsv = protectedResources == null || protectedResources.isEmpty()
                 ? null
                 : String.join(",", protectedResources);
+    }
+
+    public List<String> getRequiredTagKeys() {
+        if (requiredTagKeysCsv == null || requiredTagKeysCsv.isBlank()) {
+            return List.of();
+        }
+        return java.util.Arrays.stream(requiredTagKeysCsv.split(","))
+                .map(String::trim)
+                .filter(s -> !s.isEmpty())
+                .toList();
+    }
+
+    public void setRequiredTagKeys(List<String> requiredTagKeys) {
+        this.requiredTagKeysCsv = requiredTagKeys == null || requiredTagKeys.isEmpty()
+                ? null
+                : String.join(",", requiredTagKeys);
     }
 }

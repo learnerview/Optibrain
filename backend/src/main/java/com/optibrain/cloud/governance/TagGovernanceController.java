@@ -27,8 +27,9 @@ public class TagGovernanceController {
     /**
      * Tag coverage report.
      *
-     * <p>{@code keys} is optional. Absent or empty, the report uses the platform
-     * defaults ({@code Environment}, {@code Owner}).
+     * <p>{@code keys} is optional. Absent or empty, the report uses the current
+     * tenant's configured required keys, falling back to the platform defaults
+     * ({@code Environment}, {@code Owner}).
      *
      * <p>Declared once rather than as an overload pair: two handlers on the same path
      * would be an ambiguous mapping and fail at startup.
