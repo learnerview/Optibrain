@@ -1,0 +1,57 @@
+# OptiBrain ML service dependencies.
+#
+# Target runtime: Python 3.14 (the version installed on this machine and used by the
+# Docker image).
+#
+# The previous pin of `numpy<2.0.0` made this requirements file uninstallable on 3.14:
+# NumPy 1.x publishes no cp314 wheels, so pip fell back to a source build and failed.
+# Everything below was verified to resolve to a binary wheel for cp314.
+
+# --- Core numerics ---------------------------------------------------------
+numpy>=2.0            # 1.x has no cp314 wheels; 2.x is the first supporting line
+pandas>=2.2
+scikit-learn>=1.6
+
+# --- API -------------------------------------------------------------------
+fastapi>=0.115
+uvicorn[standard]>=0.32
+pydantic>=2.9
+pydantic-settings>=2.6
+aiohttp>=3.10
+python-dotenv>=1.0
+
+# --- Storage / cache -------------------------------------------------------
+redis>=5.2
+sqlalchemy>=2.0
+
+# --- Utilities -------------------------------------------------------------
+loguru>=0.7
+joblib>=1.4
+aiofiles>=24.1
+
+# --- Testing ---------------------------------------------------------------
+pytest>=8.3
+pytest-asyncio>=0.24
+
+# Deliberately NOT listed, and why:
+#
+#   prophet      - pulls a compiled Stan toolchain via cmdstanpy. It resolved for cp314
+#                  at the time of writing but is a fragile dependency that needs a C++
+#                  toolchain in the image. Forecasting is currently done with
+#                  statsmodels/sklearn. Add it only if the Prophet model is actually
+#                  used, and pin the version.
+#   tensorflow   - a ~600MB dependency. Nothing in this service imports it; it was
+#                  left over from an abandoned deep-learning path.
+#   torch        - same.
+#   statsmodels  - currently unused; forecasting_service uses sklearn. Listed here
+#                  rather than removed pending that cleanup, since it is a small,
+#                  safe dependency if it is reintroduced.
+#   matplotlib / seaborn / pyod - plotting and anomaly libraries. Not imported by the
+#                  service at present.
+#   mlflow       - model tracking. model_manager.py was removed; no import remains.
+#   psycopg2-binary - no PostgreSQL connection is made.
+#   google-generativeai - chat_service falls back to canned replies; the Gemini client
+#                  is optional and not required to start.
+#
+# If a dependency is reintroduced, add it here with a cp314-verified version rather than
+# reinstalling the old file.
