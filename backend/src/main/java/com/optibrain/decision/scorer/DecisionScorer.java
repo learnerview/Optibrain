@@ -1,6 +1,7 @@
 package com.optibrain.decision.scorer;
 
 import com.optibrain.cloud.model.ActionResult;
+import com.optibrain.common.context.TenantContext;
 import com.optibrain.decision.model.Decision;
 import com.optibrain.metrics.model.MetricData;
 import com.optibrain.policy.model.Policy;
@@ -8,10 +9,13 @@ import com.optibrain.policy.service.PolicyService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
+import java.util.ArrayDeque;
 import java.util.ArrayList;
-import java.util.LinkedList;
+import java.util.Deque;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 
 @Component
 @RequiredArgsConstructor
@@ -19,25 +23,38 @@ public class DecisionScorer {
 
     private final PolicyService policyService;
     private final com.optibrain.cloud.remediator.CloudRemediator remediator;
-    private final List<Double> cpuHistory = new LinkedList<>();
+
+    /**
+     * Trend history is per decision subject, keyed by tenant and resource, never global.
+     * A shared list would let one tenant's or resource's CPU observations move the trend
+     * read for a different resource, which is exactly the cross-contamination the multi-
+     * tenant design must avoid.
+     */
+    private final Map<String, Deque<Double>> cpuHistory = new ConcurrentHashMap<>();
     private static final int MAX_HISTORY = 5;
 
     public Decision scoreAndDecide(MetricData metrics) {
         Policy policy = policyService.getCurrentPolicy();
-        
+
         List<String> explanation = new ArrayList<>();
-        
-        // 1. Update History & Calculate Trend
+
+        // Autonomous execution is only safe when the metric actually identifies a
+        // resource. Acting on a placeholder id would issue an AWS call against a
+        // resource that does not exist, so an unattributed metric only gets scored.
+        String instanceId = instanceIdOf(metrics);
+
+        // 1. Update History & Calculate Trend (scoped to this tenant:resource)
         double cpuFactor = metrics.getCpuUtilization();
-        updateHistory(cpuFactor);
-        String trend = calculateTrend();
-        
+        String subjectKey = historyKey(TenantContext.getTenantId(), instanceId);
+        updateHistory(subjectKey, cpuFactor);
+        String trend = calculateTrend(subjectKey);
+
         // 2. Calculate Factors Based on Policy Weights
         double costFactor = (metrics.getHourlyCost() / 500.0) * 100; // Normalized cost
 
         double score = (cpuFactor * policy.getPerformanceWeight()) - (costFactor * policy.getCostWeight());
-        
-        explanation.add(String.format("Performance weight (%.1f) vs Cost weight (%.1f)", 
+
+        explanation.add(String.format("Performance weight (%.1f) vs Cost weight (%.1f)",
                 policy.getPerformanceWeight(), policy.getCostWeight()));
         explanation.add(String.format("Current CPU Utilization: %.1f%% (Trend: %s)", cpuFactor, trend));
         explanation.add(String.format("Current Hourly Cost mapped to factor: %.1f", costFactor));
@@ -45,15 +62,10 @@ public class DecisionScorer {
         String action = "NONE";
         String reason = "System operating within optimal parameters";
         String executionStatus = "SIMULATED";
-        
-        // thresholds are now policy driven
-        double scaleUpThreshold = policy.getCpuThreshold() - 50; 
-        double scaleDownThreshold = -20; // Default buffer, could also be dynamic
 
-        // Autonomous execution is only safe when the metric actually identifies a
-        // resource. Acting on a placeholder id would issue an AWS call against a
-        // resource that does not exist, so an unattributed metric only gets scored.
-        String instanceId = instanceIdOf(metrics);
+        // thresholds are now policy driven
+        double scaleUpThreshold = policy.getCpuThreshold() - 50;
+        double scaleDownThreshold = -20; // Default buffer, could also be dynamic
 
         // 3. Decision Logic with Trend Awareness
         if (score > scaleUpThreshold) {
@@ -102,7 +114,7 @@ public class DecisionScorer {
                 .reason(reason)
                 .score(score)
                 .explanation(explanation)
-                .confidence(0.95)
+                .confidence(confidenceOf(trend, instanceId != null))
                 .mode(policy.isAutoOptimizationEnabled() ? "AUTONOMOUS_ACTIVE" : "AUTONOMOUS_SCORER")
                 // Previously computed but never written to the Decision, so the outcome of
                 // an autonomous action was silently dropped.
@@ -121,19 +133,40 @@ public class DecisionScorer {
         return id == null || id.isBlank() ? null : id;
     }
 
-    private void updateHistory(double cpu) {
-        if (cpuHistory.size() >= MAX_HISTORY) {
-            cpuHistory.remove(0);
-        }
-        cpuHistory.add(cpu);
+    private static String historyKey(String tenantId, String resourceId) {
+        return (tenantId == null || tenantId.isBlank() ? "untracked" : tenantId) + ":"
+                + (resourceId == null ? "unattributed" : resourceId);
     }
 
-    private String calculateTrend() {
-        if (cpuHistory.size() < 3) return "STABLE";
-        double first = cpuHistory.get(0);
-        double last = cpuHistory.get(cpuHistory.size() - 1);
+    private void updateHistory(String key, double cpu) {
+        Deque<Double> history = cpuHistory.computeIfAbsent(key, k -> new ArrayDeque<>());
+        if (history.size() >= MAX_HISTORY) {
+            history.removeFirst();
+        }
+        history.addLast(cpu);
+    }
+
+    private String calculateTrend(String key) {
+        Deque<Double> history = cpuHistory.get(key);
+        if (history == null || history.size() < 3) return "STABLE";
+        double first = history.getFirst();
+        double last = history.getLast();
         if (last > first + 5) return "UPWARD";
         if (last < first - 5) return "DOWNWARD";
         return "STABLE";
+    }
+
+    /**
+     * A heuristic, not a statistical measure. The decision surface has no probabilistic
+     * model, so a fixed value like 0.95 would assert a precision the code never
+     * computes. The value is driven by what is actually observable here: whether the
+     * metric names a concrete resource, and whether enough history exists to read a
+     * clear trend.
+     */
+    private double confidenceOf(String trend, boolean attributed) {
+        if ("STABLE".equals(trend)) {
+            return attributed ? 0.6 : 0.5;
+        }
+        return attributed ? 0.9 : 0.7;
     }
 }

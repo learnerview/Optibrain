@@ -44,8 +44,10 @@ protection tag is refused when it is submitted.
 
 Beyond the protection tag, `execute` refuses a destructive action whose target cannot be
 verified in the current inventory (`"Target resource could not be found in the inventory;
-refusing to apply a change that cannot be verified"`) and refuses a `planToken` that no
-longer matches live state (`"The plan is stale: ... Recompute the plan and retry."`).
+refusing to apply a change that cannot be verified"`), refuses `RESIZE_INSTANCE` on any
+instance the inventory does not confirm as `stopped` (`"An instance must be stopped before
+resizing..."`), and refuses a `planToken` that no longer matches live state (`"The plan is
+stale: ... Recompute the plan and retry."`).
 Repeated `idempotencyKey`s replay the stored outcome instead of mutating twice.
 
 ## Credentials

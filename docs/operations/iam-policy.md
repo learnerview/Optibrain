@@ -136,7 +136,10 @@ read-only policy has been running and reviewed.
 
 The dry-run interlock in `AwsCloudProviderAdapter#execute` blocks these actions before any
 call is issued, so a read-only role plus `cloud.dry-run=true` permits full analysis with no
-write capability at all. `ec2:ModifyInstanceAttribute` supports `RESIZE_INSTANCE`;
+write capability at all. `ec2:ModifyInstanceAttribute` supports `RESIZE_INSTANCE` - which
+further requires the target to already be `stopped`, so an operator who can reach the call
+still has to stop the instance first (`ec2:StopInstances`) and restart it afterwards
+(`ec2:StartInstances`); grant all three or the resize path is blocked.
 `autoscaling:UpdateAutoScalingGroup` supports `SCALE_GROUP`. Actions the adapter does not
 implement (commitment purchase, bucket deletion, network-resource deletion, data-store
 deletion) require no permission, because they are refused before any call is made.

@@ -4,6 +4,7 @@ import com.optibrain.cloud.aws.AwsClientFactory;
 import com.optibrain.cloud.config.CloudMode;
 import com.optibrain.cloud.config.CloudProperties;
 import com.optibrain.cloud.model.ActionResult;
+import com.optibrain.cloud.model.ActionType;
 import com.optibrain.cloud.model.CloudResource;
 import com.optibrain.cloud.model.CostReport;
 import com.optibrain.cloud.model.DataStatus;
@@ -391,6 +392,20 @@ public class AwsCloudProviderAdapter implements CloudProviderPort {
             return ActionResult.rejected(action,
                     "Target resource could not be found in the inventory; refusing to apply "
                             + "a change that cannot be verified");
+        }
+
+        // EC2 instance-type changes require a stopped instance. A direct modify against a
+        // running instance either fails or silently changes a machine that is doing work,
+        // so resize refuses unless the inventory confirms the instance is stopped. This
+        // check runs before the dry-run return on purpose: simulating "would resize" for
+        // an instance the guard would refuse is a forecast of an impossible change.
+        if (action.type() == ActionType.RESIZE_INSTANCE) {
+            String state = target.map(CloudResource::state).orElse(null);
+            if (!"stopped".equals(state)) {
+                return ActionResult.rejected(action,
+                        "An instance must be stopped before resizing; current state: "
+                                + (state == null ? "unverifiable" : state));
+            }
         }
 
         if (dryRun) {

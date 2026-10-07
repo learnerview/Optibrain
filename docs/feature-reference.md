@@ -121,7 +121,7 @@ transparently and refused at execution:
 | `RELEASE_ELASTIC_IP` | Low | `ec2:ReleaseAddress` (requires `allocationId`) |
 | `SCALE_GROUP` | Low | `autoscaling:UpdateAutoScalingGroup` (requires `desiredCapacity`) |
 | `APPLY_TAGS` | Low | `ec2:CreateTags` (`key`/`value`); the `optibrain:protected` key is refused |
-| `RESIZE_INSTANCE` | Medium | `ec2:ModifyInstanceAttribute` (requires `instanceType`) |
+| `RESIZE_INSTANCE` | Medium | `ec2:ModifyInstanceAttribute` (requires `instanceType`; instance must be `stopped`) |
 | `PURCHASE_COMMITMENT` | Medium | None - planned, refused at execution |
 | `DELETE_SNAPSHOT` | High | `ec2:DeleteSnapshot` |
 | `DELETE_VOLUME` | High | `ec2:DeleteVolume` |
@@ -130,7 +130,7 @@ transparently and refused at execution:
 | `DELETE_DATASTORE` | Critical | None - planned, refused at execution |
 | `TERMINATE_INSTANCE` | Critical | `ec2:TerminateInstances` |
 
-Two guards apply inside `AwsCloudProviderAdapter#execute`, the only mutation site:
+Three guards apply inside `AwsCloudProviderAdapter#execute`, the only mutation site:
 
 - **Dry-run.** `cloud.dry-run` defaults to `true`. A dry-run produces the same result
   shape as a real run with `applied: false`, so the interface renders both through one
@@ -139,6 +139,10 @@ Two guards apply inside `AwsCloudProviderAdapter#execute`, the only mutation sit
   actions. The check is shared via `ProtectionPolicy` by the scanners (which set the
   `protected` flag), the planner (which explains the block) and the executor (which
   enforces it).
+- **Stopped-state.** `RESIZE_INSTANCE` is refused unless discovery confirms the target
+  instance is `stopped`. The check runs before the dry-run return on purpose: a
+  simulation must forecast a change the guard would actually allow, and an instance-type
+  change against a running machine either fails or silently changes a working host.
 
 Execution also re-derives the plan from live state before mutating, refuses destructive
 actions whose target cannot be verified, replays repeated `idempotencyKey`s, and refuses a

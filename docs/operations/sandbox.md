@@ -32,6 +32,7 @@ type the product analyses, including the cases that should produce a recommendat
 | VPC (`10.0.0.0/16`) + public subnet (`us-east-1a`) | Networking for instances and gateways |
 | Baseline instance (`t3.micro`, running, tagged) | Healthy resource that raises no recommendation |
 | Idle instance (`m5.4xlarge`, running) | Rightsizing candidate |
+| Stopped instance (`t3.medium`) | The `RESIZE_INSTANCE` target (type changes require a stopped instance) |
 | Unattached EBS volume (100 GiB) | `ORPHAN_CLEANUP` candidate; tagged `orphan-candidate`, `Environment=dev` |
 | The same volume, tagged `optibrain:protected=true` | Exercises the destructive-action guard |
 | Snapshot of that volume | Exercises the snapshot scanner |
@@ -41,8 +42,9 @@ type the product analyses, including the cases that should produce a recommendat
 | S3 bucket `optibrain-sandbox-bucket` | Inventory coverage |
 | SQS queue `optibrain-sandbox-queue` | Inventory coverage |
 
-All running instances are tagged `Name=sandbox-<id>`, `Environment=dev`, `Owner=platform`
-so tag-based filtering and governance have data to work on.
+All instances (running and the stopped resize target) are tagged `Name=sandbox-<id>`,
+`Environment=dev`, `Owner=platform` so tag-based filtering and governance have data to
+work on.
 
 ## Re-running
 

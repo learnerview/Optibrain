@@ -74,8 +74,10 @@ fi
 # ---------------------------------------------------------------------------
 # Instances.
 #
-# i-0opt00busy  t3.micro   running, tagged as a workload  -> healthy baseline
-# i-0opt00idle  m5.4xlarge stopped, tagged Environment=dev -> should be flagged idle
+# t3.micro    running, tagged as a workload -> healthy baseline
+# m5.4xlarge  running, low CPU               -> rightsizing signal
+# t3.medium   stopped                        -> RESIZE_INSTANCE target (an instance
+#                                              type change requires a stopped instance)
 # ---------------------------------------------------------------------------
 echo "==> Instances"
 # The AWS CLI cannot force a chosen instance id, so create a baseline workload and then
@@ -137,6 +139,25 @@ for id in $ALL_RUNNING; do
   step "tag instance $id" ec2 create-tags --resources "$id" \
     --tags Key=Name,Value="sandbox-$id" Key=Environment,Value=dev Key=Owner,Value=platform
 done
+
+# ---------------------------------------------------------------------------
+# A stopped instance. The adapter refuses to resize a running instance, so the
+# sandbox needs one that is already stopped for the RESIZE_INSTANCE path to be
+# reachable at all. Guarded so a re-seed does not accumulate more instances.
+# ---------------------------------------------------------------------------
+has_stopped=$(ec2 describe-instances --filters "Name=instance-state-name,Values=stopped" \
+  --query 'length(Reservations[].Instances[])' --output text 2>/dev/null || echo 0)
+if [ "$has_stopped" = "0" ]; then
+  STOPPED_ID=$(ec2 run-instances --image-id ami-12345678 --instance-type t3.medium --count 1 \
+    --query 'Instances[0].InstanceId' --output text 2>/dev/null || true)
+  if [ -n "$STOPPED_ID" ] && [ "$STOPPED_ID" != "None" ]; then
+    step "stop instance $STOPPED_ID" ec2 stop-instances --instance-ids "$STOPPED_ID"
+    step "tag stopped instance $STOPPED_ID" ec2 create-tags --resources "$STOPPED_ID" \
+      --tags Key=Name,Value="sandbox-$STOPPED_ID" Key=Environment,Value=dev Key=Owner,Value=platform
+  fi
+else
+  echo "    ok: stopped instance already exists"
+fi
 
 # ---------------------------------------------------------------------------
 # Snapshots and an idle load balancer.

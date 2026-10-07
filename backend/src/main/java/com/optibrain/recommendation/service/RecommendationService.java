@@ -45,13 +45,21 @@ public class RecommendationService implements OptimizationService {
     private final RecommendationRepository repository;
 
     /**
-     * The tenant this thread is running for. Falls back to the default tenant so the
-     * recommendation surface keeps working in contexts (tests, bootstrap) without a
-     * security-derived membership.
+     * The tenant this thread is running for.
+     *
+     * <p>Every HTTP request reaching this service has passed {@code TenantFilter}, which
+     * derives the tenant from the authenticated principal and rejects any request without
+     * one. Writing rows under a fabricated "default" tenant when the context is missing
+     * would silently attribute decisions to a tenant that does not exist, so a missing
+     * context is an error, not a fallback.
      */
     private String currentTenant() {
         String tenantId = TenantContext.getTenantId();
-        return tenantId == null || tenantId.isBlank() ? "default" : tenantId;
+        if (tenantId == null || tenantId.isBlank()) {
+            throw new IllegalStateException(
+                    "Recommendation operations require a tenant context; none is set on this thread");
+        }
+        return tenantId;
     }
 
     /**

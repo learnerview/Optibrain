@@ -1,6 +1,9 @@
 package com.optibrain.decision.scorer;
 
 import com.optibrain.decision.model.Decision;
+import com.optibrain.cloud.model.ActionResult;
+import com.optibrain.cloud.model.ActionType;
+import com.optibrain.cloud.model.ResourceAction;
 import com.optibrain.cloud.remediator.CloudRemediator;
 import com.optibrain.metrics.model.MetricData;
 import com.optibrain.policy.model.Policy;
@@ -15,6 +18,7 @@ import java.time.Instant;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.when;
 
 class DecisionScorerTest {
@@ -45,6 +49,11 @@ class DecisionScorerTest {
                 ))
                 .build();
         when(policyService.getCurrentPolicy()).thenReturn(mockPolicy);
+        ActionResult ok = ActionResult.succeeded(
+                ResourceAction.of(ActionType.STOP_INSTANCE, "i-x", true, "test"),
+                "simulated", 0.0);
+        when(remediator.executeScaleUp(anyString(), anyString())).thenReturn(ok);
+        when(remediator.executeScaleDown(anyString(), anyString())).thenReturn(ok);
     }
 
     @Test
@@ -88,5 +97,36 @@ class DecisionScorerTest {
         Decision decision = decisionScorer.scoreAndDecide(metrics);
 
         assertEquals("NONE", decision.getAction());
+    }
+
+    @Test
+    void historyIsIsolatedPerResourceAndConfidenceIsEvidenceDriven() {
+        MetricData busy = MetricData.builder()
+                .cpuUtilization(95.0)
+                .hourlyCost(100.0)
+                .timestamp(Instant.now())
+                .dimensions(Map.of("InstanceId", "i-busy"))
+                .build();
+        MetricData quiet = MetricData.builder()
+                .cpuUtilization(60.0)
+                .hourlyCost(200.0)
+                .timestamp(Instant.now())
+                .dimensions(Map.of("InstanceId", "i-quiet"))
+                .build();
+
+        decisionScorer.scoreAndDecide(busy);
+        decisionScorer.scoreAndDecide(busy);
+        decisionScorer.scoreAndDecide(busy);
+
+        // Under a global history, i-quiet's first reading would already see i-busy's
+        // values and report a downward trend. With per-resource history it has exactly
+        // one sample and stays STABLE.
+        Decision quietDecision = decisionScorer.scoreAndDecide(quiet);
+
+        assertTrue(quietDecision.getExplanation().stream()
+                .anyMatch(e -> e.contains("Trend: STABLE")));
+        assertEquals("i-quiet", quietDecision.getResourceId());
+        assertEquals(0.6, quietDecision.getConfidence(), 0.001,
+                "attributed + stable trend scores 0.6, never a hardcoded 0.95");
     }
 }

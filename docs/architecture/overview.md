@@ -127,6 +127,15 @@ immediately rather than defaulting silently. Annotations in
 (`CLOUD_MODE`, `CLOUD_DRY_RUN`, `SANDBOX_ENDPOINT`, `AWS_REGION`, `JWT_SECRET`,
 `DB_URL`, `DB_USERNAME`, `DB_PASSWORD`, `SERVER_PORT`, `ALLOWED_ORIGINS`, ...).
 
+## Scope
+
+Single-region by design. `AwsClientFactory` builds every client for the one configured
+`cloud.aws.region` (default us-east-1), and every scanner reports that region on the
+resources it finds. Cost Explorer is reached on its global us-east-1 endpoint
+(`cloud.aws.cost-explorer-region`), because that is the only region AWS hosts it in.
+There is no multi-region aggregation: resources in a second AWS region simply are not
+discovered, and multi-region support would be a new feature, not a flag.
+
 ## Multi-tenancy
 
 `TenantFilter` (registered in `FilterConfig` after the Spring Security chain) derives the
