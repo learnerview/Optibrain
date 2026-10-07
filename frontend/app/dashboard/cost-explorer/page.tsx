@@ -56,9 +56,16 @@ export default function CostExplorerPage() {
             description={error}
             onRetry={reload}
           />
-        ) : !data || !data.available ? (
+        ) : !data || data.status === "UNAVAILABLE" ? (
           <EmptyState
-            title="No cost data available"
+            variant="error"
+            title="Cost data unavailable"
+            description="The provider could not be reached, so no spend is shown. Reporting zero here would misrepresent the account; retry when Cost Explorer is reachable."
+            onRetry={reload}
+          />
+        ) : !data.available || data.status === "EMPTY" ? (
+          <EmptyState
+            title="No spend measured"
             description="Cost Explorer returned no spend for this period. This is expected in the LocalStack sandbox, which does not implement Cost Explorer; run against a real AWS account to populate it."
           />
         ) : (

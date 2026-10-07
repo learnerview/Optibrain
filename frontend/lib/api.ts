@@ -176,6 +176,8 @@ export interface CostExplorerBreakdownRow {
   percentage: number;
 }
 
+export type DataStatus = "AVAILABLE" | "EMPTY" | "UNAVAILABLE";
+
 export interface CostExplorerData {
   from: string;
   to: string;
@@ -187,7 +189,13 @@ export interface CostExplorerData {
   costByRegion: Record<string, number>;
   dailyCosts: { date: string; cost: number }[];
   serviceBreakdown: CostExplorerBreakdownRow[];
-  /** false when Cost Explorer returned nothing; renders an empty state, not zeros-as-data. */
+  /**
+   * Honest data status: AVAILABLE when figures were measured, EMPTY when the account
+   * returned no spend for the period, UNAVAILABLE when the query failed or the provider
+   * could not be reached. Rendering should never treat the last two as zero spend.
+   */
+  status: DataStatus;
+  /** false when the status is not AVAILABLE; kept for the existing empty-state logic. */
   available: boolean;
 }
 
@@ -237,6 +245,7 @@ export interface MonthlyReport {
   };
   topCostServices: { service: string; cost: number }[];
   dailySpend: { date: string; cost: number }[];
+  status: DataStatus;
   available: boolean;
 }
 
@@ -381,6 +390,11 @@ export interface RemediationPlan {
   sandboxed: boolean;
   steps: string[];
   executable: boolean;
+  /**
+   * Digest of the plan inputs that can change while the plan sits on a desk. Execute
+   * must echo it back so the backend can refuse to apply a stale plan.
+   */
+  token: string;
 }
 
 export interface ActionResult {
@@ -432,10 +446,54 @@ export const executeRemediation = (body: {
   resourceId: string;
   parameters?: Record<string, string>;
   dryRun?: boolean;
+  /**
+   * Correlation id. Resubmitting the same key for the same tenant replays the stored
+   * outcome instead of mutating the account a second time.
+   */
+  idempotencyKey?: string;
+  /** Token from a previously fetched plan; guards against executing a stale plan. */
+  planToken?: string;
 }) =>
   apiRequest<ActionResult>("/remediation/execute", {
     method: "POST",
     body: JSON.stringify(body),
+  });
+
+export interface RemediationActionSummary {
+  type: ActionType;
+  risk: string;
+  destructive: boolean;
+}
+
+export interface RemediationExecutionRecord {
+  type: ActionType;
+  resourceId: string;
+  applied: boolean;
+  dryRun: boolean;
+  success: boolean;
+  message: string;
+  executedAt: string;
+}
+
+export const listRemediationActions = () =>
+  apiRequest<RemediationActionSummary[]>("/remediation/actions");
+
+export const getRemediationHistory = () =>
+  apiRequest<RemediationExecutionRecord[]>("/remediation/history");
+
+export const approveRecommendation = (id: string) =>
+  apiRequest<boolean>(`/recommendations/${encodeURIComponent(id)}/approve`, {
+    method: "POST",
+  });
+
+export const rejectRecommendation = (id: string) =>
+  apiRequest<boolean>(`/recommendations/${encodeURIComponent(id)}/reject`, {
+    method: "POST",
+  });
+
+export const executeRecommendation = (id: string) =>
+  apiRequest<boolean>(`/recommendations/${encodeURIComponent(id)}/execute`, {
+    method: "POST",
   });
 
 export const listTenants = () => apiRequest<Tenant[]>("/tenants");

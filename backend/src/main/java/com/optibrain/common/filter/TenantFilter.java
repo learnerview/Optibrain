@@ -15,7 +15,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UserDetails;
-import org.springframework.stereotype.Component;
 
 import java.io.IOException;
 
@@ -27,8 +26,11 @@ import java.io.IOException;
  * {@code X-TENANT} / {@code X-USER} headers are tolerated only when they exactly match
  * the principal, and a mismatch is rejected with 403; they are never used to select a
  * tenant themselves.
+ *
+ * <p>Registered once, for {@code /api/*}, by {@link
+ * com.optibrain.common.config.FilterConfig} rather than as a component, so there is a
+ * single servlet-filter registration at a known order (after the Spring Security chain).
  */
-@Component
 @RequiredArgsConstructor
 @Slf4j
 public class TenantFilter implements Filter {

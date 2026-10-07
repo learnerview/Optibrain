@@ -7,6 +7,7 @@ import com.optibrain.tenant.model.Tenant;
 import com.optibrain.tenant.service.TenantCredentialService;
 import jakarta.annotation.PostConstruct;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 import software.amazon.awssdk.awscore.client.builder.AwsClientBuilder;
 import software.amazon.awssdk.auth.credentials.AwsBasicCredentials;
@@ -76,6 +77,8 @@ public class AwsClientFactory {
         this(cloudProperties, null);
     }
 
+    /** The constructor Spring uses; the single-arg form exists for unit tests. */
+    @Autowired
     public AwsClientFactory(CloudProperties cloudProperties, TenantCredentialService tenants) {
         this.cloudProperties = cloudProperties;
         this.tenants = tenants;

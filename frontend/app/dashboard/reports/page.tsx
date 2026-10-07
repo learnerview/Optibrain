@@ -50,9 +50,16 @@ export default function ReportsPage() {
             description={error}
             onRetry={reload}
           />
-        ) : !data || !data.available ? (
+        ) : !data || data.status === "UNAVAILABLE" ? (
           <EmptyState
-            title="No report data"
+            variant="error"
+            title="Report unavailable"
+            description="The provider could not be reached, so the report is not produced. A placeholder zero-total would misrepresent the account period; retry when Cost Explorer is reachable."
+            onRetry={reload}
+          />
+        ) : !data.available || data.status === "EMPTY" ? (
+          <EmptyState
+            title="No spend measured"
             description="Cost Explorer returned no spend for the reporting period, so there is nothing to summarise. Expected in the LocalStack sandbox."
           />
         ) : (

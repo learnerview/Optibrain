@@ -1,17 +1,53 @@
 'use client'
 
 import DashboardLayout from '@/components/dashboard/dashboard-layout'
-import { getRecommendations } from '@/lib/api'
+import {
+    approveRecommendation,
+    executeRecommendation,
+    getRecommendations,
+    rejectRecommendation,
+} from '@/lib/api'
 import { useApi } from '@/hooks/use-api'
 import { EmptyState } from '@/components/empty-state'
 import { formatCurrency, formatDateTime, formatPercent } from '@/lib/format'
 import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { Brain, TrendingDown, AlertCircle, CheckCircle2 } from 'lucide-react'
+import { Button } from '@/components/ui/button'
+import { useState } from 'react'
+import {
+    Brain,
+    TrendingDown,
+    AlertCircle,
+    CheckCircle2,
+    Play,
+    X,
+    Clock3,
+} from 'lucide-react'
 
 export default function RecommendationsPage() {
     const { data, loading, error, reload } = useApi(getRecommendations, [])
     const recommendations = data ?? []
+    const [busyId, setBusyId] = useState<string | null>(null)
+    const [feedback, setFeedback] = useState<string | null>(null)
+
+    async function act(
+        id: string | undefined,
+        fn: (id: string) => Promise<boolean>,
+        okMessage: string
+    ) {
+        if (!id) return
+        setBusyId(id)
+        setFeedback(null)
+        try {
+            const applied = await fn(id)
+            setFeedback(applied ? okMessage : 'Action was not applied (blocked or not in the required state).')
+        } catch (cause) {
+            setFeedback(cause instanceof Error ? cause.message : 'Request failed')
+        } finally {
+            setBusyId(null)
+            reload()
+        }
+    }
 
     const totalMonthlySavings = recommendations.reduce(
         (sum, rec) => sum + (rec.monthlySavings ?? 0),
@@ -41,6 +77,13 @@ export default function RecommendationsPage() {
                         </div>
                     )}
                 </div>
+
+                {feedback && (
+                    <div className='flex items-start gap-2 rounded-lg border border-blue-500/20 bg-blue-500/5 p-3 text-sm'>
+                        <Brain className='mt-0.5 h-4 w-4 shrink-0 text-blue-400' aria-hidden />
+                        <span className='text-blue-300'>{feedback}</span>
+                    </div>
+                )}
 
                 {loading ? (
                     <div className='grid animate-pulse gap-6'>
@@ -102,6 +145,20 @@ export default function RecommendationsPage() {
                                                     confidence
                                                 </Badge>
                                             )}
+                                            {rec.status ? (
+                                                <Badge
+                                                    variant={
+                                                        rec.status === 'PENDING' ||
+                                                        rec.status === 'APPROVED'
+                                                            ? 'outline'
+                                                            : rec.status === 'EXECUTED'
+                                                                ? 'default'
+                                                                : 'destructive'
+                                                    }
+                                                >
+                                                    {rec.status}
+                                                </Badge>
+                                            ) : null}
                                         </div>
 
                                         {rec.resourceId && (
@@ -133,6 +190,70 @@ export default function RecommendationsPage() {
                                                 </span>
                                             </div>
                                         )}
+
+                                        <div className='flex flex-wrap gap-2 pt-1'>
+                                            {rec.status === 'PENDING' && (
+                                                <>
+                                                    <Button
+                                                        size='sm'
+                                                        variant='outline'
+                                                        disabled={busyId === rec.id}
+                                                        onClick={() =>
+                                                            act(
+                                                                rec.id,
+                                                                approveRecommendation,
+                                                                'Approved — ready to execute'
+                                                            )
+                                                        }
+                                                    >
+                                                        {busyId === rec.id ? (
+                                                            <Clock3 className='mr-1 h-3 w-3 animate-spin' aria-hidden />
+                                                        ) : (
+                                                            <CheckCircle2 className='mr-1 h-3 w-3' aria-hidden />
+                                                        )}
+                                                        Approve
+                                                    </Button>
+                                                    <Button
+                                                        size='sm'
+                                                        variant='outline'
+                                                        disabled={busyId === rec.id}
+                                                        onClick={() =>
+                                                            act(
+                                                                rec.id,
+                                                                rejectRecommendation,
+                                                                'Rejected'
+                                                            )
+                                                        }
+                                                    >
+                                                        <X className='mr-1 h-3 w-3' aria-hidden />
+                                                        Reject
+                                                    </Button>
+                                                </>
+                                            )}
+                                            {rec.status === 'APPROVED' && (
+                                                <Button
+                                                    size='sm'
+                                                    variant='default'
+                                                    disabled={busyId === rec.id}
+                                                    onClick={() =>
+                                                        act(
+                                                            rec.id,
+                                                            executeRecommendation,
+                                                            'Executed (or simulated under dry-run)'
+                                                        )
+                                                    }
+                                                >
+                                                    <Play className='mr-1 h-3 w-3' aria-hidden />
+                                                    Execute
+                                                </Button>
+                                            )}
+                                            {rec.status === 'FAILED' && (
+                                                <p className='text-xs text-red-500'>
+                                                    Execution was blocked or failed — review the
+                                                    remediation history.
+                                                </p>
+                                            )}
+                                        </div>
                                     </div>
                                 </div>
                             </Card>
