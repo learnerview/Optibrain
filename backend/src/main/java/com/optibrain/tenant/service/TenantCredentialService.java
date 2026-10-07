@@ -130,6 +130,12 @@ public class TenantCredentialService {
         if (changes.getProtectedResources() != null) {
             existing.setProtectedResources(changes.getProtectedResources());
         }
+        if (changes.getAwsRoleArn() != null) {
+            existing.setAwsRoleArn(changes.getAwsRoleArn().isBlank() ? null : changes.getAwsRoleArn().trim());
+        }
+        if (changes.getAwsExternalId() != null) {
+            existing.setAwsExternalId(changes.getAwsExternalId().isBlank() ? null : changes.getAwsExternalId().trim());
+        }
         enforceModeInvariant(existing);
         return tenants.save(existing);
     }

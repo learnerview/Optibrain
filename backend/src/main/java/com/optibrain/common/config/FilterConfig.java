@@ -9,9 +9,9 @@ import org.springframework.context.annotation.Configuration;
 public class FilterConfig {
 
     @Bean
-    public FilterRegistrationBean<TenantFilter> tenantFilter() {
+    public FilterRegistrationBean<TenantFilter> tenantFilter(TenantFilter tenantFilter) {
         FilterRegistrationBean<TenantFilter> registrationBean = new FilterRegistrationBean<>();
-        registrationBean.setFilter(new TenantFilter());
+        registrationBean.setFilter(tenantFilter);
         registrationBean.addUrlPatterns("/api/*");
         return registrationBean;
     }

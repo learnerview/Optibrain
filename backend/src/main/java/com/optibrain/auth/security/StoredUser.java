@@ -13,12 +13,21 @@ import java.util.List;
  * {@code CredentialsContainer}: no part of the authentication chain may erase its
  * password, so a successful login can never invalidate the next one (see
  * {@code UserStoreLoginTest}).
+ *
+ * <p>Carries the tenant a user belongs to so {@code TenantFilter} can derive the
+ * {@code TenantContext} from the authenticated principal instead of trusting a header.
  */
-record StoredUser(String username, String password, Collection<? extends GrantedAuthority> authorities)
+public record StoredUser(String username, String password, String tenantId, boolean enabled,
+                  Collection<? extends GrantedAuthority> authorities)
         implements UserDetails {
 
-    StoredUser {
+    public StoredUser {
         authorities = List.copyOf(authorities);
+    }
+
+    static StoredUser of(String username, String password, String tenantId, boolean enabled,
+                         Collection<? extends GrantedAuthority> authorities) {
+        return new StoredUser(username, password, tenantId, enabled, authorities);
     }
 
     @Override
@@ -53,6 +62,6 @@ record StoredUser(String username, String password, Collection<? extends Granted
 
     @Override
     public boolean isEnabled() {
-        return true;
+        return enabled;
     }
 }

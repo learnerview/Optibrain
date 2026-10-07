@@ -19,6 +19,8 @@ public class TenantUpdateRequest {
     private Boolean requireApprovalForChanges;
     private Double monthlyBudgetLimit;
     private List<String> protectedResources;
+    private String awsRoleArn;
+    private String awsExternalId;
 
     public String getName() {
         return name;
@@ -74,5 +76,21 @@ public class TenantUpdateRequest {
 
     public void setProtectedResources(List<String> protectedResources) {
         this.protectedResources = protectedResources;
+    }
+
+    public String getAwsRoleArn() {
+        return awsRoleArn;
+    }
+
+    public void setAwsRoleArn(String awsRoleArn) {
+        this.awsRoleArn = awsRoleArn;
+    }
+
+    public String getAwsExternalId() {
+        return awsExternalId;
+    }
+
+    public void setAwsExternalId(String awsExternalId) {
+        this.awsExternalId = awsExternalId;
     }
 }

@@ -3,6 +3,8 @@ package com.optibrain.auth.controller;
 import com.optibrain.common.dto.ApiResponse;
 import com.optibrain.auth.dto.LoginRequest;
 import com.optibrain.auth.dto.RegisterRequest;
+import com.optibrain.auth.security.StoredUser;
+import com.optibrain.auth.security.UserStore;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -15,6 +17,7 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 
 import jakarta.servlet.http.HttpServletRequest;
+import java.util.HashMap;
 import java.util.Map;
 import com.optibrain.auth.security.JwtService;
 
@@ -27,7 +30,7 @@ public class AuthController {
 
     private final AuthenticationManager authenticationManager;
     private final JwtService jwtService;
-    private final com.optibrain.auth.security.UserStore userStore;
+    private final UserStore userStore;
     private final org.springframework.security.crypto.password.PasswordEncoder passwordEncoder;
 
     /**
@@ -59,13 +62,15 @@ public class AuthController {
             SecurityContextHolder.getContext().setAuthentication(auth);
             String token = jwtService.generate(auth.getName());
 
-            Map<String, Object> userData = Map.of(
-                    "username", auth.getName(),
-                    "authenticated", true,
-                    "authorities", auth.getAuthorities().stream()
-                            .map(a -> a.getAuthority()).toList(),
-                    "token", token
-            );
+            Map<String, Object> userData = new HashMap<>();
+            userData.put("username", auth.getName());
+            userData.put("authenticated", true);
+            userData.put("authorities", auth.getAuthorities().stream()
+                    .map(a -> a.getAuthority()).toList());
+            userData.put("token", token);
+            if (auth.getPrincipal() instanceof StoredUser stored) {
+                userData.put("tenantId", stored.tenantId());
+            }
             log.info("Successful login for {}", auth.getName());
             return ResponseEntity.ok(ApiResponse.success(userData, "Login successful"));
         } catch (AuthenticationException e) {
@@ -97,7 +102,8 @@ public class AuthController {
                 "username", username,
                 "authenticated", true,
                 "authorities", user.getAuthorities().stream().map(a -> a.getAuthority()).toList(),
-                "token", token
+                "token", token,
+                "tenantId", UserStore.DEFAULT_TENANT
         ), "Registration successful"));
     }
     

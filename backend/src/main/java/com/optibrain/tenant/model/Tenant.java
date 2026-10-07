@@ -29,7 +29,9 @@ import java.util.List;
  *
  * <p>Credentials are <strong>not</strong> modelled here. Storing long-lived AWS keys
  * alongside a tenant row is the wrong shape; see {@code AwsClientFactory} for how
- * credentials are actually resolved.
+ * credentials are actually resolved. What is modelled is the IAM role {@code AwsClientFactory}
+ * should {@code AssumeRole} into for this tenant (and the external id needed to
+ * authenticate the assumption), so per-tenant scoping never requires a key column.
  */
 @Entity
 @Table(name = "tenants", indexes = {
@@ -93,6 +95,21 @@ public class Tenant {
      */
     @Column(length = 2000)
     private String protectedResourcesCsv;
+
+    /**
+     * IAM role to assume for this tenant's AWS operations. Null means the tenant runs
+     * against the ambient credential chain. An assumed-role setting applies only in
+     * {@code cloud.mode=AWS}; the sandbox ignores it.
+     */
+    @Column(length = 2048)
+    private String awsRoleArn;
+
+    /**
+     * External id required to assume {@link #getAwsRoleArn()}, if the role's trust
+     * policy demands one. Optional; ignored when null or blank.
+     */
+    @Column(length = 1224)
+    private String awsExternalId;
 
     @Column(nullable = false, updatable = false)
     private Instant createdAt;
