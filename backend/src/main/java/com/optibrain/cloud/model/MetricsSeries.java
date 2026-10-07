@@ -12,21 +12,30 @@ import java.util.List;
  * @param unit CloudWatch unit (Percent, Count, Bytes...)
  * @param granularity spacing between points, as a duration rather than an instant
  * @param points observations, oldest first
+ * @param status whether the series is measured evidence ({@link DataStatus#AVAILABLE}) or
+ *               should not be read as "zero" or "idle"
  */
 public record MetricsSeries(
         String resourceId,
         String metric,
         String unit,
         Duration granularity,
-        List<Point> points
+        List<Point> points,
+        DataStatus status
 ) {
 
     public MetricsSeries {
         points = points == null ? List.of() : List.copyOf(points);
+        status = status == null ? DataStatus.AVAILABLE : status;
     }
 
     public boolean isEmpty() {
         return points.isEmpty();
+    }
+
+    /** True only when the series is measured evidence. */
+    public boolean isUsable() {
+        return status == DataStatus.AVAILABLE;
     }
 
     public double average() {

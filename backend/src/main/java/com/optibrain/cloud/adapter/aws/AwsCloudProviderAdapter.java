@@ -6,6 +6,7 @@ import com.optibrain.cloud.config.CloudProperties;
 import com.optibrain.cloud.model.ActionResult;
 import com.optibrain.cloud.model.CloudResource;
 import com.optibrain.cloud.model.CostReport;
+import com.optibrain.cloud.model.DataStatus;
 import com.optibrain.cloud.model.MetricsSeries;
 import com.optibrain.cloud.model.ResourceAction;
 import com.optibrain.cloud.port.CloudProviderPort;
@@ -23,6 +24,8 @@ import software.amazon.awssdk.services.cloudwatch.model.GetMetricStatisticsReque
 import software.amazon.awssdk.services.cloudwatch.model.GetMetricStatisticsResponse;
 import software.amazon.awssdk.services.cloudwatch.model.Statistic;
 import software.amazon.awssdk.services.costexplorer.model.DateInterval;
+import software.amazon.awssdk.services.costexplorer.model.DimensionValues;
+import software.amazon.awssdk.services.costexplorer.model.Expression;
 import software.amazon.awssdk.services.costexplorer.model.GetCostAndUsageRequest;
 import software.amazon.awssdk.services.costexplorer.model.GetCostAndUsageResponse;
 import software.amazon.awssdk.services.costexplorer.model.Group;
@@ -138,7 +141,7 @@ public class AwsCloudProviderAdapter implements CloudProviderPort {
         Duration spacing = query.period();
         if (query.metricName() == null || query.dimensions().isEmpty()) {
             return new MetricsSeries(resourceKey(query), query.metricName(), query.namespace(),
-                    spacing, List.of());
+                    spacing, List.of(), DataStatus.EMPTY);
         }
         try (var cw = clients.cloudWatch()) {
             List<Dimension> dimensions = query.dimensions().entrySet().stream()
@@ -162,13 +165,16 @@ public class AwsCloudProviderAdapter implements CloudProviderPort {
                     .sorted(Comparator.comparing(MetricsSeries.Point::timestamp))
                     .toList();
 
+            // An empty response for a valid window is a genuine absence; a failed call
+            // is not, and is distinguished above by the exception path.
+            DataStatus status = points.isEmpty() ? DataStatus.EMPTY : DataStatus.AVAILABLE;
             return new MetricsSeries(resourceKey(query), query.metricName(), query.namespace(),
-                    spacing, points);
+                    spacing, points, status);
         } catch (Exception e) {
-            log.debug("No telemetry for {} {}: {}", query.namespace(), query.metricName(),
+            log.warn("No telemetry for {} {}: {}", query.namespace(), query.metricName(),
                     e.getMessage());
             return new MetricsSeries(resourceKey(query), query.metricName(), query.namespace(),
-                    spacing, List.of());
+                    spacing, List.of(), DataStatus.UNAVAILABLE);
         }
     }
 
@@ -207,11 +213,18 @@ public class AwsCloudProviderAdapter implements CloudProviderPort {
             GetCostAndUsageResponse primary = fetchCostAndUsage(ce, query, "SERVICE");
 
             Map<String, BigDecimal> byService = new LinkedHashMap<>();
+            Map<String, List<CostReport.TimeBucket>> byServiceDaily = new LinkedHashMap<>();
             for (ResultByTime bucket : primary.resultsByTime()) {
+                Instant day = startOfDay(bucket.timePeriod());
                 for (Group group : bucket.groups()) {
-                    byService.merge(keyOrUnattributed(group.keys()), unblended(group), BigDecimal::add);
+                    String service = keyOrUnattributed(group.keys());
+                    byService.merge(service, unblended(group), BigDecimal::add);
+                    byServiceDaily.computeIfAbsent(service, k -> new java.util.ArrayList<>())
+                            .add(new CostReport.TimeBucket(day, unblended(group), false));
                 }
             }
+            byServiceDaily.forEach((service, buckets) -> buckets.sort(
+                    Comparator.comparing(CostReport.TimeBucket::start)));
 
             List<CostReport.TimeBucket> byDay = primary.resultsByTime().stream()
                     .map(bucket -> new CostReport.TimeBucket(
@@ -229,7 +242,7 @@ public class AwsCloudProviderAdapter implements CloudProviderPort {
                     total, byService,
                     groupedTotals(ce, query, "REGION"),
                     groupedTotals(ce, query, "LINKED_ACCOUNT"),
-                    byDay);
+                    byDay, byServiceDaily, DataStatus.AVAILABLE);
         } catch (Exception e) {
             log.warn("Cost Explorer unavailable, returning empty report: {}", e.getMessage());
             return CostReport.empty(query.start(), query.end());
@@ -315,7 +328,37 @@ public class AwsCloudProviderAdapter implements CloudProviderPort {
                     .key(dimensionKey)
                     .build());
         }
+        applyFilters(request, query);
         return ce.getCostAndUsage(request.build());
+    }
+
+    /**
+     * Restricts the report to the service and region named on the query.
+     *
+     * <p>Cost Explorer offers one effective filter per dimension, so two named filters
+     * are combined with an AND rather than appended. A service or region other than the
+     * caller's own simply yields an empty (but usable) report; it is the caller's data,
+     * not the API's, so a valid value for someone else's account is identical to zero
+     * spend here.
+     */
+    private void applyFilters(GetCostAndUsageRequest.Builder request, CostQuery query) {
+        String service = query.service();
+        String region = query.region();
+        DimensionValues serviceFilter = service == null ? null
+                : DimensionValues.builder().key("SERVICE").values(service).build();
+        DimensionValues regionFilter = region == null ? null
+                : DimensionValues.builder().key("REGION").values(region).build();
+
+        if (serviceFilter != null && regionFilter != null) {
+            request.filter(Expression.builder()
+                    .and(Expression.builder().dimensions(serviceFilter).build(),
+                            Expression.builder().dimensions(regionFilter).build())
+                    .build());
+        } else if (serviceFilter != null) {
+            request.filter(Expression.builder().dimensions(serviceFilter).build());
+        } else if (regionFilter != null) {
+            request.filter(Expression.builder().dimensions(regionFilter).build());
+        }
     }
 
     @Override

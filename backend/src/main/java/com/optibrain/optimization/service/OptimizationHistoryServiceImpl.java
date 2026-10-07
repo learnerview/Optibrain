@@ -3,8 +3,11 @@ package com.optibrain.optimization.service;
 import com.optibrain.audit.model.AuditLog;
 import com.optibrain.audit.model.AuditStatus;
 import com.optibrain.audit.repository.AuditLogRepository;
+import com.optibrain.common.context.TenantContext;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 
 import java.time.Instant;
@@ -29,16 +32,23 @@ import java.util.Map;
 @Slf4j
 public class OptimizationHistoryServiceImpl implements OptimizationHistoryService {
 
+    /** A bounded page keeps a single table read cheap on a long-lived account. */
+    private static final int HISTORY_PAGE_SIZE = 100;
+
     private final AuditLogRepository auditLogRepository;
 
     @Override
     public List<Map<String, Object>> getAllOptimizations() {
+        String tenantId = TenantContext.getTenantId();
+        if (tenantId == null || tenantId.isBlank()) {
+            return List.of();
+        }
         List<Map<String, Object>> optimizations = new ArrayList<>();
-        for (AuditLog entry : auditLogRepository.findAll()) {
+        for (AuditLog entry : auditLogRepository.findByTenantId(tenantId,
+                PageRequest.of(0, HISTORY_PAGE_SIZE,
+                        Sort.by(Sort.Direction.DESC, "createdAt")))) {
             optimizations.add(toRow(entry));
         }
-        optimizations.sort(Comparator.comparing(
-                o -> String.valueOf(o.get("timestamp")), Comparator.reverseOrder()));
         return optimizations;
     }
 

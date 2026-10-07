@@ -9,4 +9,5 @@ import java.util.UUID;
 @Repository
 public interface SpotActionRepository extends JpaRepository<SpotAction, UUID> {
     List<SpotAction> findByTenantId(String tenantId);
+    long countByTenantId(String tenantId);
 }

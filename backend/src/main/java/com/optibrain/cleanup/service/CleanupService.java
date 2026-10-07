@@ -124,7 +124,9 @@ public class CleanupService {
      * An idle load balancer is one that served no requests over the idle window.
      *
      * <p>No datapoints is treated as idle: a load balancer with no telemetry is not a
-     * load balancer carrying traffic.
+     * load balancer carrying traffic. A load balancer whose telemetry could not be
+     * retrieved at all is skipped instead: absence caused by a failed call must not be
+     * read as evidence of idleness.
      */
     private List<OrphanedResource> detectIdleLoadBalancers(String tenantId) {
         List<OrphanedResource> result = new ArrayList<>();
@@ -135,6 +137,9 @@ public class CleanupService {
                     lbName, CloudProviderPort.REQUEST_COUNT,
                     now.minus(IDLE_WINDOW), now, IDLE_WINDOW));
 
+            if (series.status() == com.optibrain.cloud.model.DataStatus.UNAVAILABLE) {
+                continue;
+            }
             double totalRequests = series.points().stream().mapToDouble(p -> p.average()).sum();
             if (totalRequests <= 0.0) {
                 result.add(toEntity(tenantId, lb, "LOAD_BALANCER",

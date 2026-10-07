@@ -50,7 +50,8 @@ public class ReportServiceImpl implements ReportService {
 
         report.put("topCostServices", serviceSpend(current));
         report.put("dailySpend", dailySpend(current));
-        report.put("available", !current.byDay().isEmpty());
+        report.put("available", current.isUsable());
+        report.put("status", current.status().name());
 
         return report;
     }

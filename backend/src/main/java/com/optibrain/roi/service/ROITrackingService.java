@@ -38,9 +38,10 @@ public class ROITrackingService {
         // comes from Cost Explorer. Previously both were literals from a demo narrative
         // ($156,000 annual savings against $128,450 monthly cost), which produced an
         // "averageRoi" of 121% that described nothing real.
-        double realisedSavings = spotActionRepository.findAll().stream()
-                .mapToDouble(SpotAction::getPredictedSavings)
-                .sum();
+        double realisedSavings = currentTenantId() == null ? 0.0
+                : spotActionRepository.findByTenantId(currentTenantId()).stream()
+                        .mapToDouble(SpotAction::getPredictedSavings)
+                        .sum();
 
         double monthlySpend = 0.0;
         try {
@@ -55,7 +56,7 @@ public class ROITrackingService {
         summary.put("monthlySpend", round(monthlySpend));
         summary.put("roiRatio", monthlySpend > 0 ? round(realisedSavings / monthlySpend) : null);
         summary.put("totalTenantsMonitored", tenantCredentialService.getAllTenants().size());
-        summary.put("activeAutomations", spotActionRepository.count());
+        summary.put("activeAutomations", spotActionRepository.countByTenantId(currentTenantId()));
         summary.put("spendAvailable", monthlySpend > 0);
         summary.put("lastCalculated", LocalDateTime.now());
 
@@ -68,13 +69,27 @@ public class ROITrackingService {
 
     public Map<String, Object> getRealTimeMetrics() {
         Map<String, Object> metrics = new HashMap<>();
-        metrics.put("liveSavingsCounter", round(spotActionRepository.findAll().stream()
-                .mapToDouble(SpotAction::getPredictedSavings).sum()));
-        metrics.put("pendingOptimizations", auditLogRepository.count());
+        String tenantId = currentTenantId();
+        metrics.put("liveSavingsCounter", round(tenantId == null ? 0.0
+                : spotActionRepository.findByTenantId(tenantId).stream()
+                        .mapToDouble(SpotAction::getPredictedSavings).sum()));
+        metrics.put("pendingOptimizations", auditLogRepository.countByTenantId(tenantId));
         // Previously the literal "OPTIMAL". A health verdict that never varies carries no
         // information, so connectivity is reported as the fact it is.
         metrics.put("connectedToCloud", isCloudReachable());
         return metrics;
+    }
+
+    /** The tenant on the thread, or the first active tenant when none is set. */
+    private String currentTenantId() {
+        String tenantId = com.optibrain.common.context.TenantContext.getTenantId();
+        if (tenantId != null && !tenantId.isBlank()) {
+            return tenantId;
+        }
+        return tenantCredentialService.getAllTenants().stream()
+                .map(Tenant::getId)
+                .findFirst()
+                .orElse(null);
     }
 
     private boolean isCloudReachable() {

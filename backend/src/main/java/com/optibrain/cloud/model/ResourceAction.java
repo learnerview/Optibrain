@@ -53,6 +53,11 @@ public record ResourceAction(
         return new ResourceAction(type, resourceId, parameters, dryRun, reason, null);
     }
 
+    public static ResourceAction of(ActionType type, String resourceId, Map<String, String> parameters,
+                                    boolean dryRun, String reason, String idempotencyKey) {
+        return new ResourceAction(type, resourceId, parameters, dryRun, reason, idempotencyKey);
+    }
+
     public String parameter(String key) {
         return parameters.get(key);
     }

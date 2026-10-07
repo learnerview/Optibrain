@@ -1,5 +1,6 @@
 package com.optibrain.cloud.port;
 
+import com.optibrain.cloud.model.DataStatus;
 import com.optibrain.cloud.model.MetricsSeries;
 
 import java.time.Duration;
@@ -9,8 +10,11 @@ import java.time.Instant;
  * Read access to utilisation telemetry.
  *
  * <p>Idle and rightsizing decisions are only as good as this data, so implementations
- * are expected to return an empty series - never a fabricated one - when telemetry is
- * genuinely unavailable. Downstream code distinguishes the two explicitly.
+ * are expected to return a series that is never a fabricated one. The status on the
+ * series distinguishes three honest states: {@link DataStatus#AVAILABLE} (measured),
+ * {@link DataStatus#EMPTY} (the source returned no observations) and
+ * {@link DataStatus#UNAVAILABLE} (the data could not be retrieved, so absence must not
+ * be read as zero or idle).
  */
 public interface TelemetrySource {
 
@@ -49,7 +53,7 @@ public interface TelemetrySource {
                                              Instant start, Instant end, Duration period) {
         if (resourceId == null || metric == null) {
             return new MetricsSeries(resourceId, metric, "None",
-                    period, java.util.List.of());
+                    period, java.util.List.of(), DataStatus.EMPTY);
         }
         return metrics(MetricQuery.forEc2Instance(resourceId, metric, start, end, period));
     }

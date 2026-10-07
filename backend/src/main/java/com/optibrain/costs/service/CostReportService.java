@@ -57,6 +57,7 @@ public class CostReportService {
                     .startDate(LocalDate.now().minusDays(days))
                     .endDate(LocalDate.now())
                     .totalCost(0.0)
+                    .status("UNAVAILABLE")
                     .error(e.getMessage())
                     .build();
         }
@@ -96,6 +97,7 @@ public class CostReportService {
                     .startDate(LocalDate.now().minusWeeks(weeks))
                     .endDate(LocalDate.now())
                     .totalCost(0.0)
+                    .status("UNAVAILABLE")
                     .error(e.getMessage())
                     .build();
         }
@@ -133,6 +135,7 @@ public class CostReportService {
                     .meanValue(totalForecast)
                     .predictionIntervalLowerBound(0.0) // Would need more data from API
                     .predictionIntervalUpperBound(0.0)
+                    .status("AVAILABLE")
                     .build();
             
         } catch (Exception e) {
@@ -141,6 +144,7 @@ public class CostReportService {
                     .startDate(LocalDate.now())
                     .endDate(LocalDate.now().plusDays(days))
                     .forecastedCost(0.0)
+                    .status("UNAVAILABLE")
                     .error(e.getMessage())
                     .build();
         }
@@ -216,6 +220,7 @@ public class CostReportService {
                 .costByService(costByService)
                 .costTimeSeries(costTimeSeries)
                 .topServices(getTopServices(costByService, 5))
+                .status("AVAILABLE")
                 .build();
     }
 
@@ -244,6 +249,7 @@ public class CostReportService {
         private Map<String, Double> costByService;
         private Map<String, List<DailyCost>> costTimeSeries;
         private List<String> topServices;
+        private String status;
         private String error;
     }
 
@@ -263,6 +269,7 @@ public class CostReportService {
         private double meanValue;
         private double predictionIntervalLowerBound;
         private double predictionIntervalUpperBound;
+        private String status;
         private String error;
     }
 }

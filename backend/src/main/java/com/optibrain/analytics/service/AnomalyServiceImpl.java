@@ -8,7 +8,6 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
-import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -26,6 +25,11 @@ import java.util.Map;
  * rather than a fixed percentage, so a service whose spend is naturally volatile is not
  * flagged every single day. With too little history the answer is "cannot determine"
  * rather than a guess.
+ *
+ * <p>Each service is scored against its own daily series, not the account total: a spike
+ * in a small service would otherwise be invisible next to a large flat one, and the
+ * account total was previously labelled with every service name, duplicating the same
+ * account-level detections under each label.
  */
 @Service
 @RequiredArgsConstructor
@@ -49,12 +53,11 @@ public class AnomalyServiceImpl implements AnomalyService {
             report = cloudProvider.costReport(CostQuery.lastDays(60));
         } catch (Exception e) {
             log.warn("Cost data unavailable for anomaly detection: {}", e.getMessage());
-            response.put("anomalies", List.of());
-            response.put("count", 0);
-            response.put("status", "UNAVAILABLE");
-            response.put("reason", "Cost data is not available: " + e.getMessage());
-            response.put("timestamp", Instant.now().toString());
-            return response;
+            return unavailable(response, "Cost data is not available: " + e.getMessage());
+        }
+
+        if (!report.isUsable()) {
+            return unavailable(response, "Cost data could not be retrieved from Cost Explorer");
         }
 
         List<TimeBucket> daily = report.byDay();
@@ -69,11 +72,13 @@ public class AnomalyServiceImpl implements AnomalyService {
         }
 
         List<Map<String, Object>> anomalies = new ArrayList<>();
-        for (Map.Entry<String, BigDecimal> entry : report.byService().entrySet()) {
-            // Per-service series would need a separate Cost Explorer call per service.
-            // Detecting on the account total is honest and cheap; per-service anomaly
-            // attribution belongs in the Cost Explorer query itself, not guessed here.
-            anomaliesFromSeries(daily, entry.getKey()).forEach(anomalies::add);
+        for (Map.Entry<String, List<TimeBucket>> entry : report.byServiceDaily().entrySet()) {
+            // A service with too little history to establish a baseline is skipped
+            // outright rather than scored against a guess.
+            if (entry.getValue().size() < MINIMUM_HISTORY) {
+                continue;
+            }
+            anomaliesFromSeries(entry.getValue(), entry.getKey()).forEach(anomalies::add);
         }
 
         response.put("anomalies", anomalies);
@@ -81,6 +86,15 @@ public class AnomalyServiceImpl implements AnomalyService {
         response.put("status", anomalies.isEmpty() ? "NOMINAL" : "ANOMALIES_DETECTED");
         response.put("method", "rolling median +/- " + DEVIATION_MULTIPLIER + " scaled MAD");
         response.put("daysAnalysed", daily.size());
+        response.put("timestamp", Instant.now().toString());
+        return response;
+    }
+
+    private Map<String, Object> unavailable(Map<String, Object> response, String reason) {
+        response.put("anomalies", List.of());
+        response.put("count", 0);
+        response.put("status", "UNAVAILABLE");
+        response.put("reason", reason);
         response.put("timestamp", Instant.now().toString());
         return response;
     }

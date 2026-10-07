@@ -22,6 +22,9 @@ import java.util.Map;
  * @param byRegion spend grouped by region
  * @param byAccount spend grouped by linked account id
  * @param byDay spend per day, oldest first, for trend rendering
+ * @param byServiceDaily spend per day per service, so per-service anomalies are detected
+ *                       on a service's own series rather than on the account total
+ * @param status whether the report is measured spend or must not be read as zero
  */
 public record CostReport(
         Instant start,
@@ -32,7 +35,9 @@ public record CostReport(
         Map<String, BigDecimal> byService,
         Map<String, BigDecimal> byRegion,
         Map<String, BigDecimal> byAccount,
-        List<TimeBucket> byDay
+        List<TimeBucket> byDay,
+        Map<String, List<TimeBucket>> byServiceDaily,
+        DataStatus status
 ) {
 
     public CostReport {
@@ -40,11 +45,24 @@ public record CostReport(
         byRegion = byRegion == null ? Map.of() : Map.copyOf(byRegion);
         byAccount = byAccount == null ? Map.of() : Map.copyOf(byAccount);
         byDay = byDay == null ? List.of() : List.copyOf(byDay);
+        byServiceDaily = byServiceDaily == null ? Map.of() : Map.copyOf(byServiceDaily);
+        status = status == null ? DataStatus.AVAILABLE : status;
     }
 
+    /** True only when the report is measured spend, not a failure fallback. */
+    public boolean isUsable() {
+        return status == DataStatus.AVAILABLE;
+    }
+
+    /**
+     * A report produced when Cost Explorer could not be reached. Its status is
+     * {@link DataStatus#UNAVAILABLE}: the {@link BigDecimal#ZERO} total here is a
+     * placeholder and a consumer must not present it as "the account spent nothing".
+     */
     public static CostReport empty(Instant start, Instant end) {
         return new CostReport(start, end, Granularity.DAILY, "USD",
-                BigDecimal.ZERO, Map.of(), Map.of(), Map.of(), List.of());
+                BigDecimal.ZERO, Map.of(), Map.of(), Map.of(), List.of(), Map.of(),
+                DataStatus.UNAVAILABLE);
     }
 
     /**
