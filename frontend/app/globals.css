@@ -1,0 +1,94 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark *));
+
+/* Neutral, high-contrast operations dashboard. Data pages render real API payloads or
+   a reasoned empty state; the theme should make the absence of data obvious, not hide it. */
+:root {
+  --background: oklch(0.985 0 0);
+  --foreground: oklch(0.21 0.005 265);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.21 0.005 265);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.21 0.005 265);
+
+  --primary: oklch(0.42 0.07 250);
+  --primary-foreground: oklch(0.99 0 0);
+
+  --secondary: oklch(0.965 0.004 260);
+  --secondary-foreground: oklch(0.233 0.012 260);
+
+  --muted: oklch(0.965 0.004 260);
+  --muted-foreground: oklch(0.512 0.014 260);
+
+  --accent: oklch(0.951 0.012 245);
+  --accent-foreground: oklch(0.233 0.012 260);
+
+  --destructive: oklch(0.577 0.245 27.325);
+  --destructive-foreground: oklch(0.985 0 0);
+
+  --border: oklch(0.928 0.005 265);
+  --input: oklch(0.928 0.005 265);
+  --ring: oklch(0.42 0.07 250);
+
+  --chart-1: oklch(0.42 0.07 250);
+  --chart-2: oklch(0.58 0.09 150);
+  --chart-3: oklch(0.67 0.14 75);
+  --chart-4: oklch(0.56 0.16 30);
+  --chart-5: oklch(0.45 0.08 200);
+
+  --radius: 0.5rem;
+
+  --sidebar: oklch(0.978 0.003 265);
+  --sidebar-foreground: oklch(0.21 0.005 265);
+  --sidebar-primary: oklch(0.42 0.07 250);
+  --sidebar-primary-foreground: oklch(0.99 0 0);
+  --sidebar-accent: oklch(0.951 0.012 245);
+  --sidebar-accent-foreground: oklch(0.233 0.012 260);
+  --sidebar-border: oklch(0.928 0.005 265);
+  --sidebar-ring: oklch(0.42 0.07 250);
+}
+
+.dark {
+  --background: oklch(0.145 0.006 260);
+  --foreground: oklch(0.985 0 0);
+  --card: oklch(0.174 0.007 260);
+  --card-foreground: oklch(0.985 0 0);
+  --popover: oklch(0.174 0.007 260);
+  --popover-foreground: oklch(0.985 0 0);
+
+  --primary: oklch(0.62 0.10 245);
+  --primary-foreground: oklch(0.145 0.006 260);
+
+  --secondary: oklch(0.223 0.012 260);
+  --secondary-foreground: oklch(0.985 0 0);
+
+  --muted: oklch(0.223 0.012 260);
+  --muted-foreground: oklch(0.708 0.012 260);
+
+  --accent: oklch(0.27 0.012 245);
+  --accent-foreground: oklch(0.985 0 0);
+
+  --destructive: oklch(0.704 0.191 22.216);
+  --destructive-foreground: oklch(0.145 0.006 260);
+
+  --border: oklch(1 0 0 / 8%);
+  --input: oklch(1 0 0 / 12%);
+  --ring: oklch(0.62 0.10 245);
+
+  --chart-1: oklch(0.62 0.10 245);
+  --chart-2: oklch(0.68 0.11 150);
+  --chart-3: oklch(0.76 0.15 75);
+  --chart-4: oklch(0.65 0.18 30);
+  --chart-5: oklch(0.58 0.11 200);
+
+  --sidebar: oklch(0.163 0.006 260);
+  --sidebar-foreground: oklch(0.985 0 0);
+  --sidebar-primary: oklch(0.62 0.10 245);
+  --sidebar-primary-foreground: oklch(0.145 0.006 260);
+  --sidebar-accent: oklch(0.27 0.012 245);
+  --sidebar-accent-foreground: oklch(0.985 0 0);
+  --sidebar-border: oklch(1 0 0 / 8%);
+  --sidebar-ring: oklch(0.62 0.10 245);
+}
