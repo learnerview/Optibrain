@@ -2,6 +2,7 @@ package com.optibrain.recommendation.service;
 
 import com.optibrain.audit.model.AuditLog;
 import com.optibrain.audit.service.AuditService;
+import com.optibrain.cloud.model.ActionType;
 import com.optibrain.cloud.port.CloudProviderPort;
 import com.optibrain.cloud.model.CloudResource;
 import com.optibrain.cloud.model.MetricsSeries;
@@ -9,7 +10,7 @@ import com.optibrain.cloud.model.ResourceType;
 import com.optibrain.cloud.port.ResourceQuery;
 import com.optibrain.cloud.port.TelemetrySource;
 import com.optibrain.cloud.config.CloudProperties;
-import com.optibrain.cloud.remediator.CloudRemediator;
+import com.optibrain.cloud.remediation.RemediationService;
 import com.optibrain.metrics.model.MetricData;
 import com.optibrain.pricing.model.InstancePricing;
 import com.optibrain.pricing.service.PricingService;
@@ -35,7 +36,7 @@ public class RecommendationService implements OptimizationService {
 
     private final PricingService pricingService;
     private final CloudProviderPort cloudProvider;
-    private final CloudRemediator cloudRemediator;
+    private final RemediationService remediation;
     private final CloudProperties cloudProperties;
     private final AuditService auditService;
     private final Map<String, Recommendation> store = new HashMap<>();
@@ -380,15 +381,17 @@ public class RecommendationService implements OptimizationService {
 
     private boolean executeRecommendation(Recommendation r) {
         String action = r.getAction();
+        boolean dryRun = cloudProperties.isDryRun();
         if ("RIGHTSIZE".equalsIgnoreCase(action)) {
-            return cloudRemediator.applyRightsizing(r.getResourceId(), r.getRecommendedType()).success();
+            return remediation.execute(ActionType.RESIZE_INSTANCE, r.getResourceId(),
+                    Map.of("instanceType", String.valueOf(r.getRecommendedType())), dryRun).success();
         }
         if ("DECOMMISSION".equalsIgnoreCase(action) || "ORPHAN_CLEANUP".equalsIgnoreCase(action)) {
-            if (cloudProperties.isDryRun()) {
-                log.info("[DRY-RUN] Would terminate resource {}", r.getResourceId());
-                return true;
-            }
-            return cloudProvider.terminateResource(r.getResourceId());
+            // Termination goes through the same pipeline as a manual remediation, so the
+            // live-inventory check, protection guard, dry-run interlock, audit record and
+            // idempotency apply equally to an approved recommendation.
+            return remediation.execute(ActionType.TERMINATE_INSTANCE, r.getResourceId(),
+                    Map.of(), dryRun).success();
         }
         if ("RI_OPTIMIZATION".equalsIgnoreCase(action) || "SP_OPTIMIZATION".equalsIgnoreCase(action)) {
             // Simulation-first: record as success; real implementation would call AWS SavingsPlans/RI APIs.

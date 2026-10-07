@@ -28,6 +28,8 @@ import java.util.List;
  * @param dryRunOnly whether the global dry-run interlock is preventing application
  * @param sandboxed whether the target is a LocalStack sandbox rather than a real account
  * @param steps what the action would do, in order
+ * @param token digest of the reactive inputs, so a caller can prove an execution is not
+ *               operating on a plan the resource state no longer matches
  */
 public record RemediationPlan(
         ActionType actionType,
@@ -44,7 +46,8 @@ public record RemediationPlan(
         String blockedReason,
         boolean dryRunOnly,
         boolean sandboxed,
-        List<String> steps
+        List<String> steps,
+        String token
 ) {
 
     public RemediationPlan {

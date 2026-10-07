@@ -1,5 +1,6 @@
 package com.optibrain.cloud.remediation;
 
+import com.optibrain.audit.service.AuditService;
 import com.optibrain.cloud.config.CloudProperties;
 import com.optibrain.cloud.model.ActionResult;
 import com.optibrain.cloud.model.ActionType;
@@ -7,6 +8,7 @@ import com.optibrain.cloud.model.CloudResource;
 import com.optibrain.cloud.model.ResourceAction;
 import com.optibrain.cloud.model.ResourceType;
 import com.optibrain.cloud.port.CloudProviderPort;
+import com.optibrain.cloud.remediation.repository.RemediationOperationRepository;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -34,10 +36,13 @@ class RemediationServiceTest {
 
     private final CloudProviderPort provider = mock(CloudProviderPort.class);
     private final CloudProperties properties = new CloudProperties();
+    private final AuditService auditService = mock(AuditService.class);
+    private final RemediationOperationRepository operations =
+            mock(RemediationOperationRepository.class);
 
     private RemediationService service(boolean dryRun) {
         properties.setDryRun(dryRun);
-        return new RemediationService(provider, properties);
+        return new RemediationService(provider, properties, auditService, operations);
     }
 
     private RemediationService service() {

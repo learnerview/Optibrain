@@ -1,5 +1,8 @@
 package com.optibrain.cloud.remediation;
 
+import com.optibrain.audit.model.AuditLog;
+import com.optibrain.audit.model.AuditStatus;
+import com.optibrain.audit.service.AuditService;
 import com.optibrain.cloud.config.CloudProperties;
 import com.optibrain.cloud.model.ActionResult;
 import com.optibrain.cloud.model.ActionType;
@@ -7,10 +10,18 @@ import com.optibrain.cloud.model.CloudResource;
 import com.optibrain.cloud.model.ResourceAction;
 import com.optibrain.cloud.port.CloudProviderPort;
 import com.optibrain.cloud.policy.ProtectionPolicy;
+import com.optibrain.cloud.remediation.model.RemediationOperation;
+import com.optibrain.cloud.remediation.model.RemediationStatus;
+import com.optibrain.cloud.remediation.repository.RemediationOperationRepository;
+import com.optibrain.common.context.TenantContext;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -25,6 +36,12 @@ import java.util.Optional;
  * <p>Execution passes the caller's {@code dryRun} flag to the provider, which also
  * applies the global interlock. Nothing here can force a change through: the provider
  * holds both guards and this service owns neither.
+ *
+ * <p>Every execution is the single path through which a mutation reaches the account,
+ * and every execution is recorded: a {@link RemediationOperation} row gives an operation
+ * an identity (surviving retries via its idempotency key), and an audit row joins the
+ * optimization history. Before dispatch the plan is re-derived from the resource's live
+ * state, so a plan that no longer matches reality is refused instead of executed.
  */
 @Service
 @RequiredArgsConstructor
@@ -33,6 +50,8 @@ public class RemediationService {
 
     private final CloudProviderPort cloudProvider;
     private final CloudProperties properties;
+    private final AuditService auditService;
+    private final RemediationOperationRepository operations;
 
     /** Bounded audit of every executed action so a reviewer can trace what changed. */
     private final java.util.List<ExecutionRecord> audit =
@@ -84,12 +103,18 @@ public class RemediationService {
                                 + "action blocked until the guard can verify it")
                 : null;
 
-        return new RemediationPlan(
+        String state = target.map(CloudResource::state).orElse("not found");
+        String region = target.map(CloudResource::region).orElse(cloudProvider.region());
+        String resourceType = target.map(r -> r.type().typeName()).orElse("unknown");
+        boolean dryRunOnly = properties.isDryRun();
+        boolean sandboxed = cloudProvider.isSandboxed();
+
+        RemediationPlan plan = new RemediationPlan(
                 type,
                 resourceId,
-                target.map(r -> r.type().typeName()).orElse("unknown"),
-                target.map(CloudResource::region).orElse(cloudProvider.region()),
-                target.map(CloudResource::state).orElse("not found"),
+                resourceType,
+                region,
+                state,
                 protectedResource,
                 type.risk(),
                 destructive,
@@ -100,23 +125,207 @@ public class RemediationService {
                 // The interlock is read from configuration, not inferred from the account
                 // being a sandbox. A sandbox can run with dry-run disabled, and reporting
                 // otherwise would tell a reviewer their change is blocked when it is not.
-                properties.isDryRun(),
-                cloudProvider.isSandboxed(),
-                stepsFor(type, parameters));
+                dryRunOnly,
+                sandboxed,
+                stepsFor(type, parameters),
+                planToken(type, resourceId, state, protectedResource, dryRunOnly, sandboxed,
+                        parameters));
+        return plan;
     }
 
-    /** Applies an action. Honours the global dry-run interlock inside the provider. */
+    /**
+     * Applies an action. Honours the global dry-run interlock inside the provider.
+     */
     public ActionResult execute(ActionType type, String resourceId,
                                 Map<String, String> parameters, boolean dryRun) {
-        ResourceAction action = ResourceAction.of(type, resourceId,
-                parameters == null ? Map.of() : parameters, dryRun, "api request");
-        ActionResult result = cloudProvider.execute(action);
-        audit.add(new ExecutionRecord(type, resourceId, result.applied(), result.dryRun(),
-                result.success(), result.message(), java.time.Instant.now()));
+        return execute(type, resourceId, parameters, dryRun, null, null);
+    }
+
+    /**
+     * Applies an action with idempotency and staleness control.
+     *
+     * @param idempotencyKey client-supplied correlation id; resubmitting the same key
+     *                       replays the stored outcome instead of mutating again
+     * @param planToken token from the plan a reviewer approved, if provided; a token that
+     *                  no longer matches the resource's live state refuses the execution
+     */
+    public ActionResult execute(ActionType type, String resourceId,
+                                Map<String, String> parameters, boolean dryRun,
+                                String idempotencyKey, String planToken) {
+        Map<String, String> safeParameters = parameters == null ? Map.of() : parameters;
+
+        String tenantId = TenantContext.getTenantId();
+        RemediationOperation replayed = replayIfKnown(tenantId, idempotencyKey);
+        if (replayed != null) {
+            log.info("Replayed {} on {} from idempotency key {}", type, resourceId,
+                    idempotencyKey);
+            return replay(replayed, type, resourceId, safeParameters);
+        }
+
+        // The plan is re-derived from the live inventory rather than taken on trust: the
+        // resource may have been terminated, protected or restarted since the reviewer
+        // saw the plan, and executing a stale plan would apply a change to that reality.
+        RemediationPlan plan = plan(type, resourceId, safeParameters);
+        ResourceAction request = ResourceAction.of(type, resourceId, safeParameters, dryRun,
+                "api request", idempotencyKey);
+
+        if (planToken != null && !planToken.isBlank() && !planToken.equals(plan.token())) {
+            ActionResult result = ActionResult.rejected(request,
+                    "The plan is stale: the resource state no longer matches it. "
+                            + "Recompute the plan and retry.");
+            record(request, result);
+            return result;
+        }
+        if (plan.blocked()) {
+            ActionResult result = ActionResult.rejected(request, plan.blockedReason());
+            record(request, result);
+            return result;
+        }
+        if (!dryRun && plan.dryRunOnly()) {
+            ActionResult result = ActionResult.rejected(request,
+                    "The global dry-run interlock is enabled; no change can be applied");
+            record(request, result);
+            return result;
+        }
+
+        ActionResult result = cloudProvider.execute(request);
+        record(request, result);
+        return result;
+    }
+
+    private void record(ResourceAction request, ActionResult result) {
+        audit.add(new ExecutionRecord(request.type(), request.resourceId(), result.applied(),
+                result.dryRun(), result.success(), result.message(), Instant.now()));
         while (audit.size() > AUDIT_CAPACITY) {
             audit.remove(0);
         }
-        return result;
+        persist(request, result);
+        persistAudit(request, result);
+    }
+
+    /** Persists the operation itself so retries and dashboards can refer to it. */
+    private void persist(ResourceAction request, ActionResult result) {
+        if (operations == null) {
+            return;
+        }
+        try {
+            RemediationOperation operation = RemediationOperation.builder()
+                    .idempotencyKey(request.idempotencyKey())
+                    .action(request.type().name())
+                    .resourceId(request.resourceId())
+                    .dryRun(request.dryRun())
+                    .status(statusOf(result))
+                    .message(result.message() != null ? result.message() : result.error())
+                    .savings(result.estimatedMonthlySavings())
+                    .build();
+            operation.setTenantId(TenantContext.getTenantId());
+            operations.save(operation);
+        } catch (Exception e) {
+            log.warn("Could not persist remediation operation: {}", e.getMessage());
+        }
+    }
+
+    private void persistAudit(ResourceAction request, ActionResult result) {
+        if (auditService == null) {
+            return;
+        }
+        try {
+            AuditLog entry = new AuditLog();
+            entry.setDecisionId("rem-" + java.util.UUID.randomUUID().toString().substring(0, 8));
+            entry.setMode("REMEDIATION");
+            entry.setRegion(cloudProvider.region());
+            entry.setReason("remediation via " + request.reason());
+            entry.setProviderSource("remediation");
+            entry.setAction(request.type().name());
+            entry.setResourceId(request.resourceId());
+            entry.setStatus(result.success() ? AuditStatus.SUCCESS : AuditStatus.FAILED);
+            entry.setExplanation(truncate(result.message() != null ? result.message() : result.error(), 1000));
+            entry.setSavings(result.estimatedMonthlySavings() == null ? 0.0
+                    : result.estimatedMonthlySavings());
+            entry.setScore(0.0);
+            auditService.record(entry);
+        } catch (Exception e) {
+            log.warn("Could not record remediation audit entry: {}", e.getMessage());
+        }
+    }
+
+    /** Returns a stored operation for the tenant and key, or null when it is new. */
+    private RemediationOperation replayIfKnown(String tenantId, String idempotencyKey) {
+        if (idempotencyKey == null || idempotencyKey.isBlank()
+                || tenantId == null || tenantId.isBlank() || operations == null) {
+            return null;
+        }
+        return operations.findByTenantIdAndIdempotencyKey(tenantId, idempotencyKey).orElse(null);
+    }
+
+    /** Reconstructs the stored outcome instead of mutating the account a second time. */
+    private ActionResult replay(RemediationOperation existing, ActionType type,
+                                String resourceId, Map<String, String> parameters) {
+        ResourceAction request = ResourceAction.of(type, resourceId, parameters,
+                existing.isDryRun(), "replayed from idempotency key",
+                existing.getIdempotencyKey());
+        String message = existing.getMessage() == null ? "Replayed from a previous execution"
+                : existing.getMessage();
+        return switch (existing.getStatus()) {
+            case SUCCESS -> ActionResult.succeeded(request, message, existing.getSavings());
+            case SIMULATED -> ActionResult.simulated(request, message, existing.getSavings());
+            case FAILED -> new ActionResult(false, false, existing.isDryRun(), type, resourceId,
+                    message, existing.getSavings(),
+                    existing.getMessage() == null ? "Action failed" : existing.getMessage(),
+                    Instant.now());
+            case REJECTED -> ActionResult.rejected(request, message);
+        };
+    }
+
+    private RemediationStatus statusOf(ActionResult result) {
+        if (result.success() && result.applied()) {
+            return RemediationStatus.SUCCESS;
+        }
+        if (result.dryRun()) {
+            return RemediationStatus.SIMULATED;
+        }
+        if (!result.success() && "Action failed".equals(result.message())) {
+            return RemediationStatus.FAILED;
+        }
+        return RemediationStatus.REJECTED;
+    }
+
+    private String truncate(String value, int max) {
+        if (value == null) {
+            return null;
+        }
+        return value.length() <= max ? value : value.substring(0, max);
+    }
+
+    /**
+     * A short digest of the plan inputs that can change while a plan sits on a desk: the
+     * resource's lifecycle state, its protection flag, the interlock and the parameters.
+     * Two plans that a reviewer would reason about identically share a token, and any of
+     * those inputs changing produces a different one.
+     */
+    private String planToken(ActionType type, String resourceId, String state,
+                             boolean protectedResource, boolean dryRunOnly, boolean sandboxed,
+                             Map<String, String> parameters) {
+        StringBuilder base = new StringBuilder();
+        base.append(type).append('|').append(resourceId).append('|').append(state).append('|')
+                .append(protectedResource).append('|').append(dryRunOnly).append('|')
+                .append(sandboxed);
+        if (parameters != null) {
+            parameters.entrySet().stream().sorted(Map.Entry.comparingByKey())
+                    .forEach(e -> base.append('|').append(e.getKey()).append('=').append(e.getValue()));
+        }
+        String input = base.toString();
+        try {
+            byte[] digest = MessageDigest.getInstance("SHA-256")
+                    .digest(input.getBytes(StandardCharsets.UTF_8));
+            StringBuilder hex = new StringBuilder(64);
+            for (byte b : digest) {
+                hex.append(String.format("%02x", b));
+            }
+            return hex.substring(0, 16);
+        } catch (NoSuchAlgorithmException e) {
+            return Integer.toHexString(input.hashCode());
+        }
     }
 
     /**

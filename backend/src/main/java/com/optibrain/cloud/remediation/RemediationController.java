@@ -57,7 +57,8 @@ public class RemediationController {
         }
         ActionResult result = remediation.execute(
                 request.actionType(), request.resourceId(),
-                request.parameters(), request.isDryRun());
+                request.parameters(), request.isDryRun(),
+                request.idempotencyKey(), request.planToken());
 
         // A rejected action is a client-visible outcome, not a transport failure, so it
         // returns 200 with success=false rather than a 4xx.
@@ -88,12 +89,18 @@ public class RemediationController {
      * @param dryRun boxed so an absent value is distinguishable from an explicit
      *                {@code false}. Absent means dry-run, so applying a change is an
      *                opt-in and never the default.
+     * @param idempotencyKey optional correlation id; a repeated key replays the stored
+     *                       outcome instead of mutating the account twice
+     * @param planToken optional token from a previously fetched plan; mismatch with the
+     *                  resource's current state refuses the execution as stale
      */
     public record RemediationRequest(
             ActionType actionType,
             String resourceId,
             Map<String, String> parameters,
-            Boolean dryRun
+            Boolean dryRun,
+            String idempotencyKey,
+            String planToken
     ) {
         public RemediationRequest {
             parameters = parameters == null ? Map.of()
