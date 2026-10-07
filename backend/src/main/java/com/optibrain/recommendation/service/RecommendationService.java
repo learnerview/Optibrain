@@ -11,14 +11,17 @@ import com.optibrain.cloud.port.ResourceQuery;
 import com.optibrain.cloud.port.TelemetrySource;
 import com.optibrain.cloud.config.CloudProperties;
 import com.optibrain.cloud.remediation.RemediationService;
+import com.optibrain.common.context.TenantContext;
 import com.optibrain.metrics.model.MetricData;
 import com.optibrain.pricing.model.InstancePricing;
 import com.optibrain.pricing.service.PricingService;
 import com.optibrain.recommendation.model.Recommendation;
+import com.optibrain.recommendation.repository.RecommendationRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Duration;
 import java.time.Instant;
@@ -39,7 +42,17 @@ public class RecommendationService implements OptimizationService {
     private final RemediationService remediation;
     private final CloudProperties cloudProperties;
     private final AuditService auditService;
-    private final Map<String, Recommendation> store = new HashMap<>();
+    private final RecommendationRepository repository;
+
+    /**
+     * The tenant this thread is running for. Falls back to the default tenant so the
+     * recommendation surface keeps working in contexts (tests, bootstrap) without a
+     * security-derived membership.
+     */
+    private String currentTenant() {
+        String tenantId = TenantContext.getTenantId();
+        return tenantId == null || tenantId.isBlank() ? "default" : tenantId;
+    }
 
     /**
      * Generates comprehensive rightsizing recommendations based on current metrics
@@ -86,7 +99,6 @@ public class RecommendationService implements OptimizationService {
             Recommendation rec = evaluateInstance(
                     id, currentType, cpuSeries.average(), memSeries.average());
             if (rec != null) {
-                store.put(rec.getId(), rec);
                 recs.add(rec);
             }
         }
@@ -104,11 +116,9 @@ public class RecommendationService implements OptimizationService {
 
         // Expand beyond rightsizing: orphan cleanup + RI/SP optimization
         for (Recommendation r : generateOrphanCleanup(measured)) {
-            store.put(r.getId(), r);
             recs.add(r);
         }
         for (Recommendation r : generateCommitmentOptimization(measured)) {
-            store.put(r.getId(), r);
             recs.add(r);
         }
         return recs;
@@ -315,10 +325,9 @@ public class RecommendationService implements OptimizationService {
      * Read access for all authenticated users
      */
     @PreAuthorize("isAuthenticated()")
+    @Transactional(readOnly = true)
     public List<Recommendation> listPending() {
-        return store.values().stream()
-                .filter(r -> "PENDING".equals(r.getStatus()))
-                .toList();
+        return repository.findByTenantIdAndStatus(currentTenant(), "PENDING");
     }
 
     /**
@@ -326,10 +335,12 @@ public class RecommendationService implements OptimizationService {
      * Requires CLOUD_INTELLIGENCE_ANALYST role or higher
      */
     @PreAuthorize("hasAnyRole('CLOUD_INTELLIGENCE_ANALYST', 'ADMIN', 'OWNER')")
+    @Transactional
     public boolean approve(String id) {
-        Recommendation r = store.get(id);
+        Recommendation r = repository.findByIdAndTenantId(id, currentTenant()).orElse(null);
         if (r != null && "PENDING".equals(r.getStatus())) {
             r.setStatus("APPROVED");
+            repository.save(r);
             log.info("[RECOMMENDATION] Approved {} by user {}", id, getCurrentUser());
             return true;
         }
@@ -341,10 +352,12 @@ public class RecommendationService implements OptimizationService {
      * Requires CLOUD_INTELLIGENCE_ANALYST role or higher
      */
     @PreAuthorize("hasAnyRole('CLOUD_INTELLIGENCE_ANALYST', 'ADMIN', 'OWNER')")
+    @Transactional
     public boolean reject(String id) {
-        Recommendation r = store.get(id);
+        Recommendation r = repository.findByIdAndTenantId(id, currentTenant()).orElse(null);
         if (r != null && "PENDING".equals(r.getStatus())) {
             r.setStatus("REJECTED");
+            repository.save(r);
             log.info("[RECOMMENDATION] Rejected {} by user {}", id, getCurrentUser());
             return true;
         }
@@ -356,8 +369,9 @@ public class RecommendationService implements OptimizationService {
      * Requires DEVOPS_ENGINEER role or higher for actual execution
      */
     @PreAuthorize("hasAnyRole('DEVOPS_ENGINEER', 'ADMIN', 'OWNER')")
+    @Transactional
     public boolean execute(String id) {
-        Recommendation r = store.get(id);
+        Recommendation r = repository.findByIdAndTenantId(id, currentTenant()).orElse(null);
         if (r != null && "APPROVED".equals(r.getStatus())) {
             if (!shouldExecute(r)) {
                 log.info("[RECOMMENDATION] Blocked by safety guardrail: {} ({})", id, r.getAction());
@@ -373,6 +387,7 @@ public class RecommendationService implements OptimizationService {
             // completed one and must never be presented as done.
             r.setStatus(success ? "EXECUTED" : "FAILED");
             r.setExecutedAt(LocalDateTime.now());
+            repository.save(r);
             recordAudit(r, mode, status, null);
             return success;
         }
@@ -444,11 +459,14 @@ public class RecommendationService implements OptimizationService {
     }
 
     @Override
+    @Transactional
     public List<Map<String, Object>> refresh() {
         // Regeneration is wired to the read path because recommendations must reflect the
-        // account as it is now: without it the store stays empty forever and the feature
-        // can never produce a row. Old rows are cleared first so an instance that stopped
-        // qualifying disappears rather than lingering.
+        // account as it is now: without it nothing is ever generated and the feature can
+        // never produce a row. Pending rows are regenerated from current state, so an
+        // instance that stopped qualifying disappears rather than lingering. Non-pending
+        // rows (approved, rejected, executed, failed) are decisions, not inventory
+        // snapshots: they are kept so a decision survives the next read and a restart.
         double attributed = 0.0;
         for (CloudResource resource : cloudProvider.discover(ResourceQuery.all())) {
             if (resource.monthlyCost() != null) {
@@ -459,8 +477,13 @@ public class RecommendationService implements OptimizationService {
                 .name("measured")
                 .hourlyCost(attributed / 730.0)
                 .build();
-        store.clear();
-        generateRightsizing(baseline);
+        List<Recommendation> fresh = generateRightsizing(baseline);
+        String tenantId = currentTenant();
+        repository.deleteByTenantIdAndStatus(tenantId, "PENDING");
+        for (Recommendation r : fresh) {
+            r.setTenantId(tenantId);
+            repository.save(r);
+        }
         return getRecommendations();
     }
 
@@ -469,8 +492,9 @@ public class RecommendationService implements OptimizationService {
      * Read access for all authenticated users
      */
     @PreAuthorize("isAuthenticated()")
+    @Transactional(readOnly = true)
     public List<Recommendation> history() {
-        return new ArrayList<>(store.values());
+        return repository.findByTenantId(currentTenant());
     }
 
     /**
