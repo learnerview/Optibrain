@@ -14,6 +14,7 @@ import com.optibrain.cloud.remediation.model.RemediationOperation;
 import com.optibrain.cloud.remediation.model.RemediationStatus;
 import com.optibrain.cloud.remediation.repository.RemediationOperationRepository;
 import com.optibrain.common.context.TenantContext;
+import com.optibrain.tenant.service.TenantCredentialService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -53,6 +54,7 @@ public class RemediationService {
     private final CloudProperties properties;
     private final AuditService auditService;
     private final RemediationOperationRepository operations;
+    private final TenantCredentialService tenantCredentialService;
 
     /** Bounded audit of every executed action so a reviewer can trace what changed. */
     private final java.util.List<ExecutionRecord> audit =
@@ -89,13 +91,23 @@ public class RemediationService {
     public RemediationPlan plan(ActionType type, String resourceId, Map<String, String> parameters) {
         Optional<CloudResource> target = cloudProvider.find(resourceId);
 
-        boolean protectedResource = target.map(CloudResource::protectedResource).orElse(false);
+        boolean tagProtected = target.map(CloudResource::protectedResource).orElse(false);
         boolean destructive = type.isDestructive();
         boolean unknownTarget = target.isEmpty() && destructive;
 
-        // Blocked means either policy refuses it (protection tag) or the guard could
-        // not verify the target. Reporting "not blocked" on an unverifiable destructive
-        // action would tell a reviewer the change was safe when it could not be checked.
+        // Tenant-specific protected-resource list: a resource can be protected by tenant
+        // policy even when it lacks the protection tag. Planning must agree with execution.
+        String tenantId = TenantContext.getTenantId();
+        boolean tenantProtected = false;
+        if (tenantId != null) {
+            var tenant = tenantCredentialService.findTenant(tenantId);
+            if (tenant.isPresent()) {
+                tenantProtected = tenant.get().getProtectedResources().stream()
+                        .anyMatch(r -> r.equals(resourceId));
+            }
+        }
+        boolean protectedResource = tagProtected || tenantProtected;
+
         boolean blocked = (protectedResource && destructive) || unknownTarget;
         String blockedReason = blocked
                 ? (protectedResource
@@ -160,7 +172,7 @@ public class RemediationService {
         if (replayed != null) {
             log.info("Replayed {} on {} from idempotency key {}", type, resourceId,
                     idempotencyKey);
-            return replay(replayed, type, resourceId, safeParameters);
+            return replay(replayed, type, resourceId, safeParameters, dryRun);
         }
 
         // The plan is re-derived from the live inventory rather than taken on trust: the
@@ -200,7 +212,7 @@ public class RemediationService {
             if (latest != null) {
                 log.info("Idempotency key {} was already reserved; replaying its outcome",
                         idempotencyKey);
-                return replay(latest, type, resourceId, safeParameters);
+                return replay(latest, type, resourceId, safeParameters, dryRun);
             }
             return ActionResult.rejected(request,
                     "Another request is already executing idempotency key " + idempotencyKey
@@ -251,6 +263,8 @@ public class RemediationService {
                 .idempotencyKey(key)
                 .action(request.type().name())
                 .resourceId(request.resourceId())
+                .parameters(request.parameters() == null ? null
+                        : serializeParameters(request.parameters()))
                 .dryRun(request.dryRun())
                 .status(RemediationStatus.IN_PROGRESS)
                 .message("Execution started")
@@ -285,6 +299,8 @@ public class RemediationService {
             claim.setMessage(message);
             claim.setSavings(savings);
             claim.setDryRun(request.dryRun());
+            claim.setParameters(request.parameters() == null ? null
+                    : serializeParameters(request.parameters()));
             operations.save(claim);
             return;
         }
@@ -292,6 +308,8 @@ public class RemediationService {
                 .idempotencyKey(request.idempotencyKey())
                 .action(request.type().name())
                 .resourceId(request.resourceId())
+                .parameters(request.parameters() == null ? null
+                        : serializeParameters(request.parameters()))
                 .dryRun(request.dryRun())
                 .status(status)
                 .message(message)
@@ -332,20 +350,47 @@ public class RemediationService {
 
     /** Reconstructs the stored outcome instead of mutating the account a second time. */
     private ActionResult replay(RemediationOperation existing, ActionType type,
-                                String resourceId, Map<String, String> parameters) {
-        ResourceAction request = ResourceAction.of(type, resourceId, parameters,
-                existing.isDryRun(), "replayed from idempotency key",
-                existing.getIdempotencyKey());
+                                String resourceId, Map<String, String> parameters,
+                                boolean dryRun) {
+        // The key identifies one operation, not a slot: reusing it for a different action
+        // or resource is a different operation and must never be answered with this one's
+        // outcome. Compare action, resource, parameters, and dryRun before reconstructing
+        // so the conflict is explicit rather than a silently misattributed replay.
+        boolean sameAction = java.util.Objects.equals(existing.getAction(),
+                type == null ? null : type.name());
+        boolean sameResource = java.util.Objects.equals(existing.getResourceId(), resourceId);
+        boolean sameDryRun = existing.isDryRun() == dryRun;
+        String existingParams = existing.getParameters();
+        String incomingParams = serializeParameters(parameters);
+        boolean sameParams = java.util.Objects.equals(
+                (existingParams == null || existingParams.isEmpty()) ? null : existingParams,
+                incomingParams);
+        if (!sameAction || !sameResource || !sameParams || !sameDryRun) {
+            ResourceAction incoming = ResourceAction.of(type, resourceId, parameters, false,
+                    "idempotency conflict", existing.getIdempotencyKey());
+            return ActionResult.rejected(incoming, "Idempotency key '"
+                    + existing.getIdempotencyKey() + "' was already used for "
+                    + existing.getAction() + " on " + existing.getResourceId()
+                    + "; it cannot be reused for " + type + " on " + resourceId);
+        }
+
+        // Only reached when the action and resource match the stored operation, so the
+        // reconstructed result is built from the stored record and cannot be repainted as
+        // the caller's new parameters.
+        ResourceAction request = ResourceAction.of(ActionType.valueOf(existing.getAction()),
+                existing.getResourceId(), parameters, existing.isDryRun(),
+                "replayed from idempotency key", existing.getIdempotencyKey());
         String message = existing.getMessage() == null ? "Replayed from a previous execution"
                 : existing.getMessage();
         return switch (existing.getStatus()) {
             case SUCCESS -> ActionResult.succeeded(request, message, existing.getSavings());
             case SIMULATED -> ActionResult.simulated(request, message, existing.getSavings());
-            case IN_PROGRESS -> new ActionResult(false, false, existing.isDryRun(), type, resourceId,
+            case IN_PROGRESS -> new ActionResult(false, false, existing.isDryRun(),
+                    request.type(), request.resourceId(),
                     "A previous execution with this idempotency key did not complete",
                     null, "Execution did not complete", Instant.now());
-            case FAILED -> new ActionResult(false, false, existing.isDryRun(), type, resourceId,
-                    message, existing.getSavings(),
+            case FAILED -> new ActionResult(false, false, existing.isDryRun(),
+                    request.type(), request.resourceId(), message, existing.getSavings(),
                     existing.getMessage() == null ? "Action failed" : existing.getMessage(),
                     Instant.now());
             case REJECTED -> ActionResult.rejected(request, message);
@@ -373,6 +418,24 @@ public class RemediationService {
     }
 
     /**
+     * Serialize a parameter map into a collision-safe canonical form. Uses length-prefixed
+     * key:value pairs so that {@code {"a":"x&b=y"}} and {@code {"a":"x","b":"y"}} cannot
+     * collide. Keys are sorted for determinism.
+     */
+    private static String serializeParameters(Map<String, String> parameters) {
+        if (parameters == null || parameters.isEmpty()) {
+            return null;
+        }
+        StringBuilder sb = new StringBuilder();
+        parameters.entrySet().stream()
+                .sorted(Map.Entry.comparingByKey())
+                .forEach(e -> sb.append(e.getKey().length()).append(':')
+                        .append(e.getKey()).append(':')
+                        .append(e.getValue().length()).append(':').append(e.getValue()));
+        return sb.toString();
+    }
+
+    /**
      * A short digest of the plan inputs that can change while a plan sits on a desk: the
      * resource's lifecycle state, its protection flag, the interlock and the parameters.
      * Two plans that a reviewer would reason about identically share a token, and any of
@@ -386,8 +449,7 @@ public class RemediationService {
                 .append(protectedResource).append('|').append(dryRunOnly).append('|')
                 .append(sandboxed);
         if (parameters != null) {
-            parameters.entrySet().stream().sorted(Map.Entry.comparingByKey())
-                    .forEach(e -> base.append('|').append(e.getKey()).append('=').append(e.getValue()));
+            base.append('|').append(serializeParameters(parameters));
         }
         String input = base.toString();
         try {

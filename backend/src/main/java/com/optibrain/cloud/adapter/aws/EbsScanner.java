@@ -9,6 +9,7 @@ import software.amazon.awssdk.services.ec2.model.DescribeSnapshotsRequest;
 import software.amazon.awssdk.services.ec2.model.DescribeVolumesRequest;
 import software.amazon.awssdk.services.ec2.model.Snapshot;
 import software.amazon.awssdk.services.ec2.model.Volume;
+import software.amazon.awssdk.services.ec2.model.VolumeAttachment;
 
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -68,10 +69,15 @@ public class EbsScanner extends AwsResourceScanner {
         spec(specs, "encrypted", volume.encrypted());
         spec(specs, "availabilityZone", volume.availabilityZone());
 
-        int attachments = volume.attachments() == null ? 0 : volume.attachments().size();
-        spec(specs, "attachmentCount", attachments);
-        if (attachments > 0) {
-            spec(specs, "attachedTo", volume.attachments().get(0).instanceId());
+        // A null attachment list is an unknown attachment state, not zero attachments, so
+        // the spec is omitted rather than reported as "0". Real AWS returns an empty list
+        // for an unattached volume, which stays an explicit zero.
+        List<VolumeAttachment> attachments = volume.attachments();
+        if (attachments != null) {
+            spec(specs, "attachmentCount", attachments.size());
+            if (!attachments.isEmpty()) {
+                spec(specs, "attachedTo", attachments.get(0).instanceId());
+            }
         }
 
         double hourly = volume.size() * AwsPriceList.volumePerGibMonth(volume.volumeTypeAsString())

@@ -10,12 +10,15 @@ import com.optibrain.cloud.model.CostReport;
 import com.optibrain.cloud.model.DataStatus;
 import com.optibrain.cloud.model.MetricsSeries;
 import com.optibrain.cloud.model.ResourceAction;
+import com.optibrain.cloud.model.ResourceType;
 import com.optibrain.cloud.port.CloudProviderPort;
 import com.optibrain.cloud.port.CostQuery;
 import com.optibrain.cloud.port.MetricQuery;
 import com.optibrain.cloud.port.ResourceQuery;
 import com.optibrain.cloud.port.ResourceScanner;
 import com.optibrain.cloud.policy.ProtectionPolicy;
+import com.optibrain.common.context.TenantContext;
+import com.optibrain.tenant.service.TenantCredentialService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -34,6 +37,7 @@ import software.amazon.awssdk.services.costexplorer.model.GroupDefinition;
 import software.amazon.awssdk.services.costexplorer.model.GroupDefinitionType;
 import software.amazon.awssdk.services.costexplorer.model.MetricValue;
 import software.amazon.awssdk.services.costexplorer.model.ResultByTime;
+import software.amazon.awssdk.services.ec2.model.Tag;
 
 import java.math.BigDecimal;
 import java.time.Duration;
@@ -71,6 +75,13 @@ public class AwsCloudProviderAdapter implements CloudProviderPort {
 
     private final AwsClientFactory clients;
     private final CloudProperties properties;
+
+    /**
+     * Tenant protection settings, read at the mutation guard. The tenant's own
+     * protected-resource list is enforced here rather than in a caller, so no path that
+     * mutates AWS can skip it.
+     */
+    private final TenantCredentialService tenants;
 
     /**
      * Every registered scanner.
@@ -375,14 +386,14 @@ public class AwsCloudProviderAdapter implements CloudProviderPort {
     public ActionResult execute(ResourceAction action) {
         boolean dryRun = action.dryRun() || properties.isDryRun();
 
-        // Protected-tag and stateful-resource guards live here, at the only place a
+        // Protected-tag and tenant protection guards live here, at the only place a
         // mutation can happen, so no service can bypass them.
         Optional<CloudResource> target = find(action.resourceId());
-        if (target.isPresent() && target.get().protectedResource()
-                && action.type().isDestructive()) {
-            return ActionResult.rejected(action,
-                    "Resource is tagged " + ProtectionPolicy.TAG + "="
-                            + ProtectionPolicy.VALUE + " and refuses destructive actions");
+        if (action.type().isDestructive()) {
+            Optional<String> protection = protectionReason(target, action.resourceId());
+            if (protection.isPresent()) {
+                return ActionResult.rejected(action, protection.get());
+            }
         }
 
         // Fail closed when discovery cannot verify the target. A throttled or failing
@@ -463,7 +474,7 @@ public class AwsCloudProviderAdapter implements CloudProviderPort {
                                         + "cannot be applied through remediation");
                     }
                     ec2.createTags(b -> b.resources(action.resourceId())
-                            .tags(t -> t.key(key).value(value)));
+                            .tags(List.of(Tag.builder().key(key).value(value).build())));
                     yield ActionResult.succeeded(action,
                             "Applied " + key + "=" + value + " to " + action.resourceId(), null);
                 }
@@ -491,6 +502,29 @@ public class AwsCloudProviderAdapter implements CloudProviderPort {
                     yield ActionResult.succeeded(action,
                             "Requested " + instanceType + " for " + action.resourceId(), null);
                 }
+                case DELETE_NETWORK_RESOURCE -> {
+                    if (target.isEmpty()
+                            || target.get().type() != ResourceType.LOAD_BALANCER) {
+                        yield ActionResult.rejected(action,
+                                "DELETE_NETWORK_RESOURCE is only implemented for load "
+                                        + "balancers");
+                    }
+                    // ELBv2 deletes by ARN, which the resource's specs carry. Deleting by
+                    // name is not an option the API offers, so a target with no resolvable
+                    // ARN is refused rather than guessed at.
+                    String arn = target.get().spec("arn");
+                    if (arn == null || arn.isBlank()) {
+                        yield ActionResult.rejected(action,
+                                "Load balancer ARN is unavailable; refusing to delete "
+                                        + action.resourceId());
+                    }
+                    try (var elb = clients.elasticLoadBalancing()) {
+                        elb.deleteLoadBalancer(b -> b.loadBalancerArn(arn));
+                    }
+                    yield ActionResult.succeeded(action,
+                            "Deleted load balancer " + action.resourceId(),
+                            projectedSavings(action));
+                }
                 default -> {
                     yield ActionResult.rejected(action,
                             "Action " + action.type() + " has no AWS implementation");
@@ -500,6 +534,40 @@ public class AwsCloudProviderAdapter implements CloudProviderPort {
             log.warn("Action {} on {} failed: {}", action.type(), action.resourceId(),
                     e.getMessage());
             return ActionResult.failed(action, e);
+        }
+    }
+
+    /**
+     * The reason a destructive action on this resource is refused, if any.
+     *
+     * <p>Two rules apply: the resource's own protection tag, and the active tenant's
+     * protected-resource list. The tenant rule is read here, at the guard, so a list an
+     * operator configured is enforced against every destructive action rather than only
+     * the callers that remember to check it.
+     *
+     * <p>A protection list that cannot be read refuses the action: failing open would
+     * apply a change whose protection status is unknown.
+     */
+    private Optional<String> protectionReason(Optional<CloudResource> target, String resourceId) {
+        if (target.isPresent() && target.get().protectedResource()) {
+            return Optional.of("Resource is tagged " + ProtectionPolicy.TAG + "="
+                    + ProtectionPolicy.VALUE + " and refuses destructive actions");
+        }
+        String tenantId = TenantContext.getTenantId();
+        if (tenantId == null || tenantId.isBlank()) {
+            return Optional.empty();
+        }
+        try {
+            return tenants.findTenant(tenantId)
+                    .filter(tenant -> ProtectionPolicy.isProtectedById(
+                            tenant.getProtectedResources(), resourceId))
+                    .map(tenant -> "Resource is in tenant " + tenantId
+                            + "'s protected-resource list and refuses destructive actions");
+        } catch (Exception e) {
+            log.warn("Tenant protection rules for {} could not be read: {}", tenantId,
+                    e.getMessage());
+            return Optional.of("Tenant protection rules could not be read; refusing a "
+                    + "destructive action that cannot be checked");
         }
     }
 
@@ -519,6 +587,7 @@ public class AwsCloudProviderAdapter implements CloudProviderPort {
             case APPLY_TAGS -> "tag " + action.resourceId();
             case SCALE_GROUP -> "scale " + action.resourceId();
             case RESIZE_INSTANCE -> "resize " + action.resourceId();
+            case DELETE_NETWORK_RESOURCE -> "delete load balancer " + action.resourceId();
             default -> action.type() + " " + action.resourceId();
         };
     }

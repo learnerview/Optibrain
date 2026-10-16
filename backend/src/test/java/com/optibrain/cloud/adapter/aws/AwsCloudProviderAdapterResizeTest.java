@@ -9,6 +9,7 @@ import com.optibrain.cloud.model.CloudResource;
 import com.optibrain.cloud.model.ResourceAction;
 import com.optibrain.cloud.model.ResourceType;
 import com.optibrain.cloud.port.ResourceScanner;
+import com.optibrain.tenant.service.TenantCredentialService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mock;
@@ -39,6 +40,7 @@ class AwsCloudProviderAdapterResizeTest {
     @Mock private AwsClientFactory clients;
     @Mock private Ec2Client ec2;
     @Mock private ResourceScanner scanner;
+    @Mock private TenantCredentialService tenants;
 
     private CloudProperties properties;
     private AwsCloudProviderAdapter adapter;
@@ -50,7 +52,7 @@ class AwsCloudProviderAdapterResizeTest {
         properties = new CloudProperties();
         properties.setMode(CloudMode.SANDBOX);
         properties.setDryRun(false);
-        adapter = new AwsCloudProviderAdapter(clients, properties, List.of(scanner));
+        adapter = new AwsCloudProviderAdapter(clients, properties, tenants, List.of(scanner));
     }
 
     private CloudResource instance(String id, String state) {
@@ -76,6 +78,7 @@ class AwsCloudProviderAdapterResizeTest {
     }
 
     @Test
+    @SuppressWarnings({"unchecked", "rawtypes"})
     void resizeAppliesToAStoppedInstance() {
         when(scanner.scan(any())).thenReturn(List.of(instance("i-stopped", "stopped")));
 when(ec2.modifyInstanceAttribute(any(Consumer.class)))
@@ -88,6 +91,7 @@ when(ec2.modifyInstanceAttribute(any(Consumer.class)))
     }
 
     @Test
+    @SuppressWarnings({"unchecked", "rawtypes"})
     void startingARunningInstanceStillWorks() {
         when(scanner.scan(any())).thenReturn(List.of(instance("i-running", "running")));
         when(ec2.startInstances(any(Consumer.class))).thenReturn(StartInstancesResponse.builder().build());

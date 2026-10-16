@@ -6,7 +6,9 @@ import lombok.*;
 import lombok.experimental.SuperBuilder;
 
 @Entity
-@Table(name = "orphaned_resources")
+@Table(name = "orphaned_resources", uniqueConstraints = @UniqueConstraint(
+        name = "uq_orphaned_resource_identity",
+        columnNames = {"tenant_id", "provider", "region", "resource_type", "resource_id"}))
 @Getter
 @Setter
 @NoArgsConstructor
@@ -14,13 +16,23 @@ import lombok.experimental.SuperBuilder;
 @SuperBuilder
 public class OrphanedResource extends BaseEntity {
 
-    @Column(nullable = false, unique = true)
+    /**
+     * Provider-native identifier. Not unique on its own: two tenants may hold resources
+     * with the same id, and ids such as a load balancer name repeat across regions. The
+     * stable identity is the composite declared on {@link Table} above.
+     */
+    @Column(name = "resource_id", nullable = false)
     private String resourceId;
 
-    @Column(nullable = false)
+    @Column(name = "resource_type", nullable = false)
     private String resourceType;
 
+    @Column(name = "region")
     private String region;
+
+    /** Provider that reported the resource, for example {@code aws}. Part of the identity. */
+    @Column(name = "provider")
+    private String provider;
 
     /**
      * Estimated monthly cost, or {@code null} when the source does not attribute one.

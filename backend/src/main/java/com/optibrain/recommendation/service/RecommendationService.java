@@ -92,7 +92,7 @@ public class RecommendationService implements OptimizationService {
 
             // No telemetry means no evidence. Recommending on absent data would make the
             // confidence score meaningless, so the instance is skipped rather than guessed.
-            if (cpuSeries.isEmpty() || cpuSeries.averageOverLast(cpuSeries.points().size()) <= 0.0) {
+            if (cpuSeries.isEmpty()) { // missing telemetry only, not zero utilization
                 log.debug("Skipping rightsizing for {}: no CPU telemetry", id);
                 continue;
             }
@@ -105,7 +105,7 @@ public class RecommendationService implements OptimizationService {
             }
 
             Recommendation rec = evaluateInstance(
-                    id, currentType, cpuSeries.average(), memSeries.average());
+                    id, currentType, instance.region(), cpuSeries.average(), memSeries.average());
             if (rec != null) {
                 recs.add(rec);
             }
@@ -275,13 +275,14 @@ public class RecommendationService implements OptimizationService {
         return List.of(riRec, spRec);
     }
 
-    private Recommendation evaluateInstance(String instanceId, String currentType, double cpu, double mem) {
-        InstancePricing current = pricingService.get(currentType);
+    private Recommendation evaluateInstance(String instanceId, String currentType, String region,
+                                            double cpu, double mem) {
+        InstancePricing current = pricingService.get(currentType, region);
         if (current == null) return null;
 
         // Heuristic: if CPU < 30% and Memory < 40%, recommend downsize
         if (cpu < 30 && mem < 40) {
-            InstancePricing cheaper = pricingService.cheapestWithAtLeast(1, 2);
+            InstancePricing cheaper = pricingService.cheapestWithAtLeast(1, 2, region);
             if (cheaper != null && cheaper.getPricePerHour() < current.getPricePerHour()) {
                 double monthlySavings = (current.getPricePerHour() - cheaper.getPricePerHour()) * 730;
                 return Recommendation.builder()
@@ -304,7 +305,7 @@ public class RecommendationService implements OptimizationService {
         }
         // Heuristic: if CPU > 80% or Memory > 85%, recommend upsize
         if (cpu > 80 || mem > 85) {
-            InstancePricing bigger = pricingService.cheapestWithAtLeast((int)(current.getVcpus() + 2), (int)(current.getMemoryGb() + 4));
+            InstancePricing bigger = pricingService.cheapestWithAtLeast(current.getVcpus() + 2, (int) (current.getMemoryGb() + 4), region);
             if (bigger != null && bigger.getPricePerHour() > current.getPricePerHour()) {
                 double monthlyCostIncrease = (bigger.getPricePerHour() - current.getPricePerHour()) * 730;
                 return Recommendation.builder()

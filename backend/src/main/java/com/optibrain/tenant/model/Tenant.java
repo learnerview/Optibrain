@@ -89,9 +89,10 @@ public class Tenant {
     private double monthlyBudgetLimit = 0.0;
 
     /**
-     * Resource ids or tag keys this tenant has marked as protected. Stored as a
-     * comma-separated list rather than a join table because it is small, read on every
-     * remediation decision, and never queried by element.
+     * Resource ids this tenant has marked as protected. Stored as a comma-separated list
+     * rather than a join table because it is small, read on every remediation decision,
+     * and never queried by element. Entries are resource ids, not tag keys: the
+     * {@code optibrain:protected} tag is how tag-level protection is expressed.
      */
     @Column(length = 2000)
     private String protectedResourcesCsv;

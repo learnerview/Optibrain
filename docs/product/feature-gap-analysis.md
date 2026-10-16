@@ -11,7 +11,7 @@ to 5, where 5 indicates a capability expected of any product in this category.
 | Cost attribution | Measured totals (service/region/linked-account/daily) from Cost Explorer; per-resource list-price estimates where honest, `null` otherwise; cost forecast |
 | Telemetry | Any CloudWatch namespace and dimension via `MetricQuery` (`GetMetricStatistics`) |
 | Recommendation engine | Orphan cleanup (EBS/VOLUME, Elastic IP, snapshot), rightsizing (CPU/memory thresholds, priced), advisory RI/SP rows from a measured baseline |
-| Remediation | Thirteen action types with risk levels; dry-run interlock, protection tag, live-state re-verification, plan tokens, idempotency keys, persisted audit |
+| Remediation | Fourteen action types (cloud.model.ActionType) with risk levels; dry-run interlock, protection tag, live-state re-verification, plan tokens, idempotency keys, persisted audit |
 | Approval workflow and RBAC | Method-level RBAC (`@EnableMethodSecurity`) on approve/reject/execute; recommendation lifecycle PENDING → APPROVED → EXECUTED, persisted per tenant so regeneration never clobbers decided rows |
 | Anomaly detection | Rolling median with scaled MAD, upper-tail only, per-service |
 | Derived alerts | Spend-spike alert (last 7 vs prior 23 days) with severity; in-memory acknowledgement |

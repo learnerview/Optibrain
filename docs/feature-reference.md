@@ -110,7 +110,7 @@ produces no alert.
 
 ## Remediation
 
-Every action type carries a risk level. Actions are planned and executed through the same
+There are 14 action types defined in com.optibrain.cloud.model.ActionType with associated RiskLevel. Actions are planned and executed through the same
 port; those without an AWS implementation in `AwsCloudProviderAdapter#execute` are planned
 transparently and refused at execution:
 

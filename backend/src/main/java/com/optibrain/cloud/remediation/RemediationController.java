@@ -60,8 +60,16 @@ public class RemediationController {
                 request.parameters(), request.isDryRun(),
                 request.idempotencyKey(), request.planToken());
 
-        // A rejected action is a client-visible outcome, not a transport failure, so it
-        // returns 200 with success=false rather than a 4xx.
+        // A rejected or failed action is a client-visible outcome, not a transport
+        // failure, so it returns 200 rather than a 4xx. The envelope must still be
+        // honest: a refusal reported as success is exactly the defect this guards. A
+        // dry-run preview, including one that reports the action would be refused, is a
+        // successful evaluation, so it keeps the success envelope.
+        if (!result.success() && !result.dryRun()) {
+            String message = result.error() != null ? result.error()
+                    : (result.message() != null ? result.message() : "Action not applied");
+            return ResponseEntity.ok(ApiResponse.failure(result, message));
+        }
         return ResponseEntity.ok(ApiResponse.success(result,
                 result.applied() ? "Action applied" : "Action not applied"));
     }

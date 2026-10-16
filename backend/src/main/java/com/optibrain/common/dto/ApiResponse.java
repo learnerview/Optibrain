@@ -51,4 +51,19 @@ public class ApiResponse<T> {
                 .timestamp(LocalDateTime.now())
                 .build();
     }
+
+    /**
+     * A failure that still carries a result payload, so a client can render the reason
+     * rather than only read it. Unlike {@link #error(String)} this is not a transport
+     * failure: a request that was understood and refused is a client-visible outcome,
+     * and the data explains it.
+     */
+    public static <T> ApiResponse<T> failure(T data, String message) {
+        return ApiResponse.<T>builder()
+                .success(false)
+                .message(message)
+                .data(data)
+                .timestamp(LocalDateTime.now())
+                .build();
+    }
 }

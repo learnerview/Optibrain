@@ -237,12 +237,16 @@ targets; otherwise `estimatedMonthlySavings` is `null`.
 
 `dryRun` defaults to `true` when absent; applying a change is always an opt-in (and
 still requires `cloud.dry-run=false`). `idempotencyKey` replays a stored outcome on
-re-submission. `planToken` re-hashes live state; a mismatch refuses the change with
+re-submission; reusing a key for a different action or resource is refused rather than
+replayed. `planToken` re-hashes live state; a mismatch refuses the change with
 `"The plan is stale: the resource state no longer matches it. Recompute the plan and retry."`.
 
 Outcome (`ActionResult`): `{ "type", "resourceId", "success", "applied", "dryRun",
-"message", "estimatedMonthlySavings", "error" }`. A rejected action returns `200` with
-`success: false` - refusal is a client-visible outcome, not a transport failure.
+"message", "estimatedMonthlySavings", "error" }`. A rejected or failed action returns
+`200` with the envelope's `success: false` and the outcome still in `data` - refusal is
+a client-visible outcome, not a transport failure. A dry-run preview, even one that
+reports the action would be refused, returns a success envelope because the evaluation
+itself succeeded.
 `history` returns `ExecutionRecord[]` (`type`, `resourceId`, `applied`, `dryRun`,
 `success`, `message`, `executedAt`) capped at the most recent 500.
 

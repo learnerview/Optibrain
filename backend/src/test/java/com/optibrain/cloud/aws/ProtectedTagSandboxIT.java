@@ -8,8 +8,6 @@ import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
-import software.amazon.awssdk.services.ec2.model.Volume;
-
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**

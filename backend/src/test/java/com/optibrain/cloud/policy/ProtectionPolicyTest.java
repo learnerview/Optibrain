@@ -4,6 +4,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -57,5 +58,15 @@ class ProtectionPolicyTest {
         tags.put("Optibrain:Protected", "true");
         tags.put("optibrain:protected ", "true");
         assertThat(ProtectionPolicy.isProtected(tags)).isFalse();
+    }
+
+    @Test
+    @DisplayName("a tenant's protected-resource entry is matched by exact resource id")
+    void tenantProtectedResourcesMatchResourceIds() {
+        assertThat(ProtectionPolicy.isProtectedById(List.of("vol-1", "i-2"), "vol-1")).isTrue();
+        assertThat(ProtectionPolicy.isProtectedById(List.of("vol-1"), "vol-2")).isFalse();
+        assertThat(ProtectionPolicy.isProtectedById(List.of("vol-1"), null)).isFalse();
+        assertThat(ProtectionPolicy.isProtectedById(List.of(), "vol-1")).isFalse();
+        assertThat(ProtectionPolicy.isProtectedById(null, "vol-1")).isFalse();
     }
 }

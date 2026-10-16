@@ -12,6 +12,8 @@ import com.optibrain.cloud.remediation.model.RemediationOperation;
 import com.optibrain.cloud.remediation.model.RemediationStatus;
 import com.optibrain.cloud.remediation.repository.RemediationOperationRepository;
 import com.optibrain.common.context.TenantContext;
+import com.optibrain.tenant.model.Tenant;
+import com.optibrain.tenant.service.TenantCredentialService;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -46,6 +48,8 @@ class RemediationServiceTest {
     private final AuditService auditService = mock(AuditService.class);
     private final RemediationOperationRepository operations =
             mock(RemediationOperationRepository.class);
+    private final TenantCredentialService tenantCredentialService =
+            mock(TenantCredentialService.class);
 
     @AfterEach
     void clearTenant() {
@@ -54,7 +58,8 @@ class RemediationServiceTest {
 
     private RemediationService service(boolean dryRun) {
         properties.setDryRun(dryRun);
-        return new RemediationService(provider, properties, auditService, operations);
+        return new RemediationService(provider, properties, auditService, operations,
+                tenantCredentialService);
     }
 
     private RemediationService service() {
@@ -280,7 +285,38 @@ class RemediationServiceTest {
     }
 
     @Test
+    @DisplayName("reusing a key for a different action is rejected, not replayed")
+    void mismatchedActionOnReusedKeyIsRejected() {
+        TenantContext.setTenantId(TENANT);
+        when(operations.findByTenantIdAndIdempotencyKey(TENANT, "k1"))
+                .thenReturn(Optional.of(stored(RemediationStatus.SUCCESS, "already stopped", 12.0)));
+
+        ActionResult result = service().execute(ActionType.TERMINATE_INSTANCE, "i-1",
+                Map.of(), true, "k1", null);
+
+        assertThat(result.success()).isFalse();
+        assertThat(result.message()).contains("already used");
+        verify(provider, never()).execute(any());
+    }
+
+    @Test
+    @DisplayName("reusing a key for a different resource is rejected, not replayed")
+    void mismatchedResourceOnReusedKeyIsRejected() {
+        TenantContext.setTenantId(TENANT);
+        when(operations.findByTenantIdAndIdempotencyKey(TENANT, "k1"))
+                .thenReturn(Optional.of(stored(RemediationStatus.SUCCESS, "already stopped", 12.0)));
+
+        ActionResult result = service().execute(ActionType.STOP_INSTANCE, "i-2",
+                Map.of(), true, "k1", null);
+
+        assertThat(result.success()).isFalse();
+        assertThat(result.message()).contains("already used");
+        verify(provider, never()).execute(any());
+    }
+
+    @Test
     @DisplayName("a claimed key contested by a concurrent request replays the winner's outcome")
+    @SuppressWarnings({"unchecked", "rawtypes"})
     void aContestedClaimReplaysTheConcurrentWinner() {
         TenantContext.setTenantId(TENANT);
         when(operations.findByTenantIdAndIdempotencyKey(TENANT, "k1"))

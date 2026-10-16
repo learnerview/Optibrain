@@ -88,9 +88,21 @@ async function apiRequest<T>(endpoint: string, init?: RequestInit): Promise<T> {
     );
   }
 
-  if (body === null || body.success === false) {
+  // A failure envelope that carries a data payload is a client-visible business
+  // outcome, not a transport failure: a refused remediation returns 200 with
+  // `success:false` and the ActionResult explaining the refusal. Surface that payload so
+  // the caller can render the reason. A failure with no payload stays an error, so the
+  // 200-with-failure service envelopes still cannot masquerade as an empty success.
+  if (body === null) {
     throw new ApiError(
-      body?.message || "The backend reported a failure without a message",
+      "The backend returned an empty response",
+      response.status,
+      endpoint
+    );
+  }
+  if (body.success === false && (body.data === null || body.data === undefined)) {
+    throw new ApiError(
+      body.message || "The backend reported a failure without a message",
       response.status,
       endpoint
     );

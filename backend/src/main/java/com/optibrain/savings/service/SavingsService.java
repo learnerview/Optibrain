@@ -2,6 +2,7 @@ package com.optibrain.savings.service;
 
 import com.optibrain.cloud.port.CloudProviderPort;
 import com.optibrain.cloud.port.CostQuery;
+import com.optibrain.common.context.TenantContext;
 import com.optibrain.recommendation.service.RecommendationService;
 import com.optibrain.savings.model.SavingsReport;
 import lombok.RequiredArgsConstructor;
@@ -50,7 +51,7 @@ public class SavingsService implements SavingsProjectionService {
         // Prefer the adapter's measured Cost Explorer coverage: it is the same number
         // Cost Explorer reports, so the adjustment is traceable rather than assumed.
         Double measuredCoverage = cloudProvider.commitmentCoverage();
-        double riCoverage = measuredCoverage != null ? measuredCoverage : riCoverage();
+        Double riCoverage = measuredCoverage != null ? measuredCoverage : riCoverage();
 
         // On-demand-priced recommendations overstate their benefit for committed
         // workloads, so the effective projection scales by the uncommitted share. When
@@ -72,47 +73,49 @@ public class SavingsService implements SavingsProjectionService {
     }
 
     /**
-     * Commitment coverage is advisory, so an unavailable Cost Explorer must not fail
-     * the whole projection.
+     * Commitment coverage from the reservation service, or {@code null} when it cannot be
+     * measured. Advisory, so an unavailable source must not fail the whole projection,
+     * and it must stay distinguishable from a genuine zero.
      */
-    private double riCoverage() {
+    private Double riCoverage() {
         try {
-            return riService.calculateCoverage("default");
+            return riService.calculateCoverage(TenantContext.getTenantId());
         } catch (Exception e) {
             log.debug("RI coverage unavailable: {}", e.getMessage());
-            return 0.0;
+            return null;
         }
     }
 
     @Override
     public Map<String, Object> getSavingsProjection() {
         SavingsReport report = generateReport();
-        double coverage = report.getRiCoveragePercentage();
+        Double coverage = report.getRiCoveragePercentage();
 
-        return Map.of(
-                "monthlySavings", report.getPotentialMonthlySavings(),
-                "annualSavings", report.getPotentialMonthlySavings() * 12,
-                // Effective savings are the projection scaled by the uncommitted share, so a
-                // reader sees the realistic benefit after existing commitments. The raw figure
-                // stays too, since it is what the recommendations summed to.
-                "effectiveMonthlySavings", report.getEffectiveMonthlySavings() != null
-                        ? report.getEffectiveMonthlySavings() : report.getPotentialMonthlySavings(),
-                "effectiveAnnualSavings", (report.getEffectiveMonthlySavings() != null
-                        ? report.getEffectiveMonthlySavings() : report.getPotentialMonthlySavings()) * 12,
-                "commitmentAdjusted", Boolean.TRUE.equals(report.getCommitmentAdjusted()),
-                "confidence", (Boolean.TRUE.equals(report.getCommitmentAdjusted())
-                        ? "Calculated (" + coverage + "% commitment coverage applied)"
-                        : "Calculated; commitment coverage unavailable, so the headline figure is the on-demand projection"),
-                "assumptions", List.of(
-                        "Sum of pending recommendations",
-                        "Recommendation values are priced from on-demand list rates; "
-                                + "effectiveMonthlySavings scales that by the share not already "
-                                + "covered by a Savings Plan or Reserved Instance",
-                        "Commitment coverage is measured from Cost Explorer and is unavailable "
-                                + "when Cost Explorer cannot be reached"),
-                // Reported so a reader can judge how much of the projection is already
-                // discounted by an existing commitment.
-                "commitmentCoveragePercentage", coverage
-        );
+        Map<String, Object> projection = new java.util.LinkedHashMap<>();
+        projection.put("monthlySavings", report.getPotentialMonthlySavings());
+        projection.put("annualSavings", report.getPotentialMonthlySavings() * 12);
+        // Effective savings are the projection scaled by the uncommitted share, so a
+        // reader sees the realistic benefit after existing commitments. The raw figure
+        // stays too, since it is what the recommendations summed to.
+        projection.put("effectiveMonthlySavings", report.getEffectiveMonthlySavings() != null
+                ? report.getEffectiveMonthlySavings() : report.getPotentialMonthlySavings());
+        projection.put("effectiveAnnualSavings", (report.getEffectiveMonthlySavings() != null
+                ? report.getEffectiveMonthlySavings() : report.getPotentialMonthlySavings()) * 12);
+        projection.put("commitmentAdjusted", Boolean.TRUE.equals(report.getCommitmentAdjusted()));
+        projection.put("confidence", (Boolean.TRUE.equals(report.getCommitmentAdjusted())
+                ? "Calculated (" + coverage + "% commitment coverage applied)"
+                : "Calculated; commitment coverage unavailable, so the headline figure is the on-demand projection"));
+        projection.put("assumptions", List.of(
+                "Sum of pending recommendations",
+                "Recommendation values are priced from on-demand list rates; "
+                        + "effectiveMonthlySavings scales that by the share not already "
+                        + "covered by a Savings Plan or Reserved Instance",
+                "Commitment coverage is measured from Cost Explorer and is unavailable "
+                        + "when Cost Explorer cannot be reached"));
+        // Reported so a reader can judge how much of the projection is already
+        // discounted by an existing commitment. Null means "not measured", which is a
+        // different claim from 0%.
+        projection.put("commitmentCoveragePercentage", coverage);
+        return projection;
     }
 }

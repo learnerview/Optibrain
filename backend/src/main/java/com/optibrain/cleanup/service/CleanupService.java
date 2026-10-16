@@ -21,9 +21,12 @@ import java.time.Duration;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * Detects and reclaims resources that are billed but not used.
@@ -68,9 +71,9 @@ public class CleanupService {
             found.addAll(detectOldSnapshots(tenantId, config.getSnapshotOldDaysThreshold()));
             found.addAll(detectIdleLoadBalancers(tenantId));
 
-            orphanedResourceRepository.saveAll(found);
-            log.debug("Detected {} orphaned resources for tenant {}", found.size(), tenantId);
-            return found.stream().map(this::mapToDTO).toList();
+            List<OrphanedResource> reported = reconcile(tenantId, found);
+            log.debug("Detected {} orphaned resources for tenant {}", reported.size(), tenantId);
+            return reported.stream().map(this::mapToDTO).toList();
         } catch (Exception e) {
             log.error("Failed to detect orphaned resources for tenant {}: {}", tenantId, e.getMessage());
             // Serving the last known good set beats serving nothing: an empty list reads
@@ -80,11 +83,98 @@ public class CleanupService {
         }
     }
 
+    /**
+     * Merges this scan into the stored inventory instead of inserting a second row for a
+     * resource that is already recorded.
+     *
+     * <p>Identity is the composite (tenant, provider, region, resource type, resource id),
+     * so two tenants holding resources with the same id, or the same load balancer name
+     * in two regions, are two separate rows. A rediscovered resource has its stored row
+     * refreshed and reopened; a stored row this scan no longer reports is closed.
+     *
+     * <p>Closing on disappearance is the explicit policy: a resource the inventory no
+     * longer reports as orphaned is either gone or no longer orphaned, and leaving it
+     * open would invite a deletion the scanner no longer stands behind. AWS scanners
+     * swallow their own failures and return nothing, so a failed section closes rows
+     * too - which is the safe direction: a closed row suppresses cleanup, and the next
+     * complete scan reopens the resource.
+     *
+     * @return the rows representing this scan, in discovery order
+     */
+    private List<OrphanedResource> reconcile(String tenantId, List<OrphanedResource> found) {
+        String provider = cloudProvider.provider();
+        Map<String, OrphanedResource> stored = new LinkedHashMap<>();
+        for (OrphanedResource row : loadStored(tenantId, provider)) {
+            stored.put(identityKey(row), row);
+        }
+
+        List<OrphanedResource> current = new ArrayList<>();
+        List<OrphanedResource> stale = new ArrayList<>();
+        Set<String> seen = new HashSet<>();
+        for (OrphanedResource row : found) {
+            row.setProvider(provider);
+            String key = identityKey(row);
+            seen.add(key);
+            OrphanedResource existing = stored.get(key);
+            if (existing == null) {
+                current.add(row);
+                continue;
+            }
+            existing.setEstimatedMonthlyCost(row.getEstimatedMonthlyCost());
+            existing.setResolved(false);
+            current.add(existing);
+        }
+        stored.forEach((key, row) -> {
+            if (!seen.contains(key) && !row.isResolved()) {
+                row.setResolved(true);
+                stale.add(row);
+            }
+        });
+
+        List<OrphanedResource> changes = new ArrayList<>(current);
+        changes.addAll(stale);
+        orphanedResourceRepository.saveAll(changes);
+        return current;
+    }
+
+    /**
+     * This tenant's stored rows, with rows written before the provider was part of the
+     * identity adopted by the provider reporting them, so an upgraded row matches this
+     * scan rather than duplicating it.
+     */
+    private List<OrphanedResource> loadStored(String tenantId, String provider) {
+        List<OrphanedResource> stored = orphanedResourceRepository.findByTenantId(tenantId);
+        stored.forEach(row -> {
+            if (row.getProvider() == null) {
+                row.setProvider(provider);
+            }
+        });
+        return stored;
+    }
+
+    private String identityKey(OrphanedResource row) {
+        return identityKey(row.getTenantId(), row.getProvider(), row.getRegion(),
+                row.getResourceType(), row.getResourceId());
+    }
+
+    private String identityKey(String tenantId, String provider, String region,
+                               String resourceType, String resourceId) {
+        return String.join("|", text(tenantId), text(provider), text(region),
+                text(resourceType), text(resourceId));
+    }
+
+    private String text(String value) {
+        return value == null ? "" : value;
+    }
+
     private List<OrphanedResource> detectUnattachedVolumes(String tenantId, int daysThreshold) {
         List<OrphanedResource> result = new ArrayList<>();
         for (CloudResource volume : cloudProvider.discover(ResourceQuery.ofTypes(ResourceType.EBS_VOLUME))) {
-            int attachments = parseInt(volume.spec("attachmentCount"));
-            if (attachments > 0) {
+            Integer attachments = parseCount(volume.spec("attachmentCount"));
+            // Only an explicit zero proves the volume is unattached. Missing or
+            // unparseable metadata is an unknown attachment state, and unknown must not
+            // become evidence for reclaiming a volume.
+            if (attachments == null || attachments != 0) {
                 continue;
             }
             if (ageInDays(volume.createdAt()) < daysThreshold) {
@@ -153,7 +243,8 @@ public class CleanupService {
      *
      * @return a human-readable outcome for the audit trail
      */
-    public String executeCleanup(String resourceId, String resourceType, boolean dryRun) {
+    public String executeCleanup(String resourceId, String resourceType, String region,
+                                 boolean dryRun) {
         String tenantId = TenantContext.getTenantId();
         ResourceType type = CLEANABLE_TYPES.get(resourceType.toUpperCase(Locale.ROOT));
         if (type == null) {
@@ -177,8 +268,10 @@ public class CleanupService {
         // A dry-run reports success yet applies nothing; marking the orphan resolved then
         // would claim a cleanup that never happened.
         if (result.applied()) {
-            orphanedResourceRepository.findByTenantId(tenantId).stream()
-                    .filter(res -> res.getResourceId().equals(resourceId))
+            String provider = cloudProvider.provider();
+            String key = identityKey(tenantId, provider, region, resourceType, resourceId);
+            loadStored(tenantId, provider).stream()
+                    .filter(res -> identityKey(res).equals(key))
                     .forEach(res -> {
                         res.setResolved(true);
                         orphanedResourceRepository.save(res);
@@ -208,14 +301,15 @@ public class CleanupService {
         return (int) ChronoUnit.DAYS.between(createdAt, Instant.now());
     }
 
-    private int parseInt(String value) {
+    /** Attachment count, or {@code null} when the provider reported no usable value. */
+    private Integer parseCount(String value) {
         if (value == null || value.isBlank()) {
-            return 0;
+            return null;
         }
         try {
             return Integer.parseInt(value.trim());
         } catch (NumberFormatException e) {
-            return 0;
+            return null;
         }
     }
 

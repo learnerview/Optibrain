@@ -70,6 +70,7 @@ public class CleanupScheduler {
                         String result = cleanupService.executeCleanup(
                                 resource.resourceId(), 
                                 resource.resourceType(), 
+                                resource.region(),
                                 false // Execute for real
                         );
                         log.info("Cleanup Result for {}: {}", resource.resourceId(), result);

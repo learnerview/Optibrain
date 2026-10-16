@@ -66,9 +66,6 @@ import java.util.concurrent.ConcurrentHashMap;
 @Slf4j
 public class AwsClientFactory {
 
-    /** How long before expiry a cached role session is treated as stale and re-assumed. */
-    private static final Duration SESSION_RENEW_LEAD = Duration.ofMinutes(5);
-
     private final CloudProperties cloudProperties;
     private final TenantCredentialService tenants;
     private final Map<String, CachedRoleSession> roleSessions = new ConcurrentHashMap<>();

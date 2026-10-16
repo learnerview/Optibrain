@@ -10,7 +10,6 @@ import software.amazon.awssdk.services.ec2.model.DescribeNetworkInterfacesReques
 import software.amazon.awssdk.services.ec2.model.DescribeNatGatewaysRequest;
 import software.amazon.awssdk.services.ec2.model.DescribeSecurityGroupsRequest;
 import software.amazon.awssdk.services.ec2.model.Filter;
-import software.amazon.awssdk.services.ec2.model.NetworkInterface;
 import software.amazon.awssdk.services.ec2.model.SecurityGroup;
 
 import java.util.LinkedHashMap;
@@ -198,6 +197,7 @@ public class NetworkScanner extends AwsResourceScanner {
                 tags, specs, null, null, null, ProtectionPolicy.isProtected(tags));
     }
 
+    @SafeVarargs
     private static List<CloudResource> merge(List<CloudResource>... groups) {
         List<CloudResource> all = new java.util.ArrayList<>();
         for (List<CloudResource> group : groups) {

@@ -59,5 +59,8 @@ public class RemediationOperation extends BaseEntity {
     @Column(length = 2000)
     private String message;
 
+    @Column(length = 4000)
+    private String parameters;
+
     private Double savings;
 }

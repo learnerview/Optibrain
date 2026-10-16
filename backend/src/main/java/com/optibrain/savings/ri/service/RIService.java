@@ -32,8 +32,8 @@ public class RIService {
             // Using CostExplorerClient to get reservation recommendations
             try (CostExplorerClient ceClient = createCostExplorerClient()) {
 
-                TermInYears term = "3yr".equalsIgnoreCase(String.valueOf(config.getRiPreferredTerm())) ? TermInYears.THREE_YEARS : TermInYears.ONE_YEAR;
-                PaymentOption payment = "ALL_UPFRONT".equalsIgnoreCase(config.getRiPaymentOption()) ? PaymentOption.ALL_UPFRONT :
+            TermInYears term = config.getRiPreferredTerm() == 3 ? TermInYears.THREE_YEARS : TermInYears.ONE_YEAR;
+            PaymentOption payment = "ALL_UPFRONT".equalsIgnoreCase(config.getRiPaymentOption()) ? PaymentOption.ALL_UPFRONT :
                                       "PARTIAL_UPFRONT".equalsIgnoreCase(config.getRiPaymentOption()) ? PaymentOption.PARTIAL_UPFRONT : PaymentOption.NO_UPFRONT;
 
                 GetReservationPurchaseRecommendationRequest request = GetReservationPurchaseRecommendationRequest.builder()
@@ -45,7 +45,7 @@ public class RIService {
 
                 GetReservationPurchaseRecommendationResponse response = ceClient.getReservationPurchaseRecommendation(request);
 
-                return mapToReservedInstances(response, tenantId);
+                return mapToReservedInstances(response, tenantId, term, payment);
             }
         } catch (Exception e) {
             log.error("Failed to fetch RI recommendations for tenant {}: {}", tenantId, e.getMessage());
@@ -53,10 +53,17 @@ public class RIService {
         }
     }
 
-    public double calculateCoverage(String tenantId) {
+    /**
+     * Commitment coverage for the tenant, or {@code null} when it cannot be measured.
+     *
+     * <p>Unavailable is not zero: a tenant with no readable Cost Explorer, or one whose
+     * id is unknown, has an unknown coverage, and reporting 0% would claim no commitments
+     * exist. Callers that need a number must decide separately how to treat null.
+     */
+    public Double calculateCoverage(String tenantId) {
          try {
             if (tenantCredentialService.findTenant(tenantId).isEmpty()) {
-                return 0.0;
+                return null;
             }
 
             try (CostExplorerClient ceClient = createCostExplorerClient()) {
@@ -76,10 +83,10 @@ public class RIService {
                    return Double.parseDouble(coverageStr);
                 }
             }
-            return 0.0;
+            return null;
         } catch (Exception e) {
             log.error("Failed to calculate RI coverage for tenant {}: {}", tenantId, e.getMessage());
-            return 0.0;
+            return null;
         }
     }
 
@@ -90,7 +97,8 @@ public class RIService {
         return awsClientFactory.costExplorer();
     }
 
-    private List<ReservedInstance> mapToReservedInstances(GetReservationPurchaseRecommendationResponse response, String tenantId) {
+    private List<ReservedInstance> mapToReservedInstances(GetReservationPurchaseRecommendationResponse response, String tenantId,
+                                                          TermInYears term, PaymentOption paymentOption) {
         List<ReservedInstance> recommendations = new ArrayList<>();
         
         if (response.recommendations() == null) return recommendations;
@@ -106,18 +114,25 @@ public class RIService {
                 double upfront = detail.upfrontCost() == null
                         ? 0.0 : Double.parseDouble(detail.upfrontCost());
 
+                String termString = term == TermInYears.THREE_YEARS ? "3yr" : "1yr";
+                String offeringType = switch (paymentOption) {
+                    case ALL_UPFRONT -> "All Upfront";
+                    case PARTIAL_UPFRONT -> "Partial Upfront";
+                    default -> "No Upfront";
+                };
+
                 recommendations.add(ReservedInstance.builder()
                         .tenantId(tenantId)
                         .provider("AWS")
                         .instanceType(detail.instanceDetails().ec2InstanceDetails().instanceType())
                         .region(detail.instanceDetails().ec2InstanceDetails().region())
                         .platform(detail.instanceDetails().ec2InstanceDetails().platform())
-                        .term("1yr") // Matching request
-                        .offeringType("No Upfront") // Matching request
+                        .term(termString)
+                        .offeringType(offeringType)
                         .instanceCount(Integer.parseInt(detail.recommendedNumberOfInstancesToPurchase()))
-                        .fixedPrice(upfront) 
+                        .fixedPrice(upfront)
                         .recurringCharges(recurringCost)
-                        .usagePrice(onDemandCost) // Using this field to store On-Demand equivalent for comparison
+                        .usagePrice(onDemandCost)
                         .currency(detail.currencyCode())
                         .state("RECOMMENDED")
                         .build());

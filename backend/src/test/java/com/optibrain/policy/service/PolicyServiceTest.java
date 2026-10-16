@@ -58,6 +58,7 @@ class PolicyServiceTest {
 
     @Test
     @DisplayName("a tenant with no policies is seeded on first read")
+    @SuppressWarnings({"unchecked", "rawtypes"})
     void tenantWithNoPoliciesIsSeededOnFirstRead() {
         TenantContext.setTenantId("t1");
         when(repository.findFirstByTenantIdAndEnabledTrueOrderByPriorityDesc("t1"))

@@ -1,5 +1,6 @@
 package com.optibrain.cloud.policy;
 
+import java.util.Collection;
 import java.util.Map;
 
 /**
@@ -30,5 +31,19 @@ public final class ProtectionPolicy {
             return false;
         }
         return VALUE.equalsIgnoreCase(tags.get(TAG));
+    }
+
+    /**
+     * True when a tenant has listed this resource id as protected.
+     *
+     * <p>Tenant entries are resource ids, not tag keys: tag-key protection is what the
+     * {@link #TAG} tag already provides, and overloading the tenant list with a second
+     * meaning would make it ambiguous which one a given entry is.
+     */
+    public static boolean isProtectedById(Collection<String> protectedResources,
+                                          String resourceId) {
+        return protectedResources != null
+                && resourceId != null
+                && protectedResources.contains(resourceId);
     }
 }
